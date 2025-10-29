@@ -97,7 +97,7 @@ export default function App(){
           try{
             const captureBody = Object.assign({}, response, { orderId: appId, cartId: cartId });
             const cap = await api.capturePayment(captureBody);
-            if(cap && (cap.ok || cap.success)){
+            if (cap && String(cap.status).toLowerCase() === 'paid'){
               alert('Payment captured successfully');
               setCart({}); setSavedCartId(null); setSavedCartIdState('(none)');
             } else alert('Capture failed');
