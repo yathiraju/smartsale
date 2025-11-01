@@ -10,10 +10,13 @@ const CART_LS_KEY = 'mobile_pos_cart_v1';
 export default function App(){
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
+  // keep these states but don't show them — disable ESLint warnings so CI won't fail
   // eslint-disable-next-line no-unused-vars
   const [username, setUsername] = useState(localStorage.getItem('rzp_username') || '(not logged in)');
   // eslint-disable-next-line no-unused-vars
   const [savedCartId, setSavedCartIdState] = useState(getSavedCartId() || '(none)');
+
+  const [paying, setPaying] = useState(false);
 
   // load products and cart from localStorage on mount
   useEffect(() => {
@@ -61,7 +64,7 @@ export default function App(){
     }catch(e){ console.error(e); alert('Login failed'); }
   }
 
-  function logout(){ setToken(null); setUser(null);  setUsername('(not logged in)'); }
+  function logout(){ setToken(null); setUser(null); setUsername('(not logged in)'); }
 
   function addToCart(product) {
     setCart(prev => {
@@ -123,17 +126,23 @@ export default function App(){
     return { sub, tax, grand };
   }
 
+  // Modified saveCart: returns response (or null) so callers can use the saved ID
   async function saveCart(){
     try{
       const items = Object.values(cart).map(ci => ({ productId: Number(ci.product.id), quantity: Number(ci.qty), priceAtAdd: Number((ci.product.price || ci.product.salePrice || 0)) }));
-      if(items.length === 0) return alert('Cart empty');
+      if(items.length === 0) {
+        alert('Cart empty');
+        return null;
+      }
       const payload = { username: null, sessionId: getSession(), items };
       const res = await api.saveCart(payload);
       if(res && res.id){
-        setSavedCartId(res.id);
+        try { setSavedCartId(res.id); } catch(_) { /* ignore if service setter not used */ }
         setSavedCartIdState(res.id);
+        return res;
       }
-    }catch(e){ console.error(e); alert('Save cart failed'); }
+      return res || null;
+    }catch(e){ console.error(e); alert('Save cart failed'); return null; }
   }
 
   async function loadActiveCart(){
@@ -150,20 +159,30 @@ export default function App(){
     }catch(e){ console.error(e); alert('Load active cart failed'); }
   }
 
-  async function checkout(){
+  // pay() performs a single save (if needed) then triggers the payment flow.
+  async function pay(){
+    if (paying) return;
+    setPaying(true);
     try{
-      let cartResp = null;
-      const saved = getSavedCartId();
-      if(saved) cartResp = { id: saved };
-      else cartResp = await (async ()=>{ const items = Object.values(cart).map(ci => ({ productId: Number(ci.product.id), quantity: Number(ci.qty), priceAtAdd: Number((ci.product.price || ci.product.salePrice || 0)) })); return await api.saveCart({ username:null, sessionId: getSession(), items }); })();
-      const cartId = cartResp && cartResp.id;
+      // Ensure cart not empty and get a saved cart id (saveCart returns saved response)
+      const savedResp = await saveCart();
+      if(!savedResp || !savedResp.id) {
+        // saveCart will alert on empty; just bail out
+        setPaying(false);
+        return;
+      }
+      const cartId = savedResp.id;
+
+      // compute amount
       const { grand } = computeTotals();
       const amountPaise = Math.round(grand * 100);
 
+      // create app order id
       const appOrderId = await api.createAppOrder();
       const appId = appOrderId && (appOrderId.orderId || appOrderId.id || appOrderId.order_id);
       if(!appId) throw new Error('No app order id');
 
+      // create payment order (Razorpay)
       const order = await api.createPaymentOrder({ amount: amountPaise, currency: 'INR', orderId: appId, receipt: 'order_' + appId });
 
       await loadRazorpayScript();
@@ -191,7 +210,12 @@ export default function App(){
       rzp.on('payment.failed', function(err){ console.error('payment failed', err); alert('Payment failed: ' + (err.error && err.error.description)); });
       rzp.open();
 
-    }catch(e){ console.error(e); alert('Checkout failed: ' + (e.message || e)); }
+    }catch(e){
+      console.error('Pay failed', e);
+      alert('Payment flow failed: ' + (e.message || e));
+    } finally {
+      setPaying(false);
+    }
   }
 
   function loadRazorpayScript(){
@@ -285,8 +309,16 @@ export default function App(){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
               <div><strong>Grand Total:</strong> ₹<span>{totals.grand.toFixed(2)}</span></div>
               <div>
-                <button onClick={saveCart}>Save Cart</button>
-                <button onClick={checkout} style={{marginLeft:8,background:'#2f855a'}}>Checkout</button>
+                <button onClick={pay} disabled={paying || totalItemsCount === 0} style={{
+                  marginLeft:8,
+                  background: paying ? '#9ca3af' : '#2f855a',
+                  color:'#fff',
+                  padding:'6px 10px',
+                  borderRadius:6,
+                  cursor: paying ? 'not-allowed' : 'pointer'
+                }}>
+                  {paying ? 'Processing…' : 'Pay'}
+                </button>
               </div>
             </div>
           </div>
