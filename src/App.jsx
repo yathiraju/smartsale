@@ -21,7 +21,9 @@ export default function App(){
     } catch(e){ console.error(e); alert('Could not fetch products'); }
   }
 
-  function saveHostClicked(){ setApiHost(apiHost); alert('API host saved'); }
+  function saveHostClicked(){
+      setApiHost(apiHost);
+      }
 
   async function login(){
     const u = prompt('Username', 'admin');
@@ -29,12 +31,12 @@ export default function App(){
     if(!u || !p) return;
     try{
       const res = await api.login(u,p);
-      if(res && res.token){ setToken(res.token); setUser(res.username || null); setTokenPreview(res.token.slice(0,24)+'...'); setUsername(res.username || u); await fetchProducts(); alert('Login successful'); }
+      if(res && res.token){ setToken(res.token); setUser(res.username || null); setTokenPreview(res.token.slice(0,24)+'...'); setUsername(res.username || u); await fetchProducts(); }
       else throw new Error('No token');
     }catch(e){ console.error(e); alert('Login failed'); }
   }
 
-  function logout(){ setToken(null); setUser(null); setTokenPreview('(none)'); setUsername('(not logged in)'); alert('Logged out'); }
+  function logout(){ setToken(null); setUser(null); setTokenPreview('(none)'); setUsername('(not logged in)'); }
 
   function addToCart(product){ setCart(prev => { const copy = {...prev}; if(!copy[product.id]) copy[product.id] = { product, qty:0 }; copy[product.id].qty += 1; return copy; }); }
   function inc(id){ setCart(prev => { const copy = {...prev}; if(copy[id]) copy[id].qty += 1; return copy; }); }
@@ -68,7 +70,7 @@ export default function App(){
       if(items.length === 0) return alert('Cart empty');
       const payload = { username: null, sessionId: getSession(), items };
       const res = await api.saveCart(payload);
-      if(res && res.id){ setSavedCartId(res.id); setSavedCartIdState(res.id); alert('Cart saved: ' + res.id); }
+      if(res && res.id){ setSavedCartId(res.id); setSavedCartIdState(res.id); }
     }catch(e){ console.error(e); alert('Save cart failed'); }
   }
 
@@ -179,7 +181,7 @@ export default function App(){
           <h3 style={{marginTop:0}}>Products</h3>
           <div style={{marginBottom:8}} className="row">
             <button onClick={fetchProducts}>Refresh</button>
-            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); alert('Test Auth finished'); }catch(e){ alert('Test Auth failed'); } }} style={{background:'#805ad5'}}>Test Auth</button>
+            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{background:'#805ad5'}}>Test Auth</button>
             <button onClick={loadActiveCart} style={{background:'#4a5568'}}>Load Active Cart</button>
             <button onClick={clearCart} style={{background:'#e53e3e'}}>Clear Cart</button>
           </div>
