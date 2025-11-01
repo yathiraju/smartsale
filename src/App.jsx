@@ -2,11 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { api, getApiHost, setApiHost, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession } from './services/api';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
+import logo from './logo.svg';
+import './App.css';
 
 export default function App(){
   const [apiHost, setHost] = useState(getApiHost());
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
+  // keep tokenPreview and savedCartId because build failed with them unused
   const [tokenPreview, setTokenPreview] = useState(getToken() ? (getToken().slice(0,24) + '...') : '(none)');
   const [username, setUsername] = useState(localStorage.getItem('rzp_username') || '(not logged in)');
   const [savedCartId, setSavedCartIdState] = useState(getSavedCartId() || '(none)');
@@ -22,33 +25,74 @@ export default function App(){
   }
 
   function saveHostClicked(){
-      setApiHost(apiHost);
-      }
+    setApiHost(apiHost);
+  }
 
   async function login(){
-       const userInput = document.getElementById('login-username');
-       const passwordInput = document.getElementById('login-password');
+    const userInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
 
-       if (!userInput || !passwordInput) {
-         alert('Login fields not found in DOM');
-         return;
-       }
+    if (!userInput || !passwordInput) {
+      alert('Login fields not found in DOM');
+      return;
+    }
 
-   const userName =userInput.value.trim();
-   const password =passwordInput.value.trim();
+    const userName = userInput.value.trim();
+    const password = passwordInput.value.trim();
     try{
-      const res = await api.login(userName,password);
-      if(res && res.token){ setToken(res.token); setUser(userName || null); setTokenPreview(res.token.slice(0,24)+'...'); setUsername(username); await fetchProducts(); }
-      else throw new Error('No token');
+      const res = await api.login(userName, password);
+      if(res && res.token){
+        setToken(res.token);
+        setUser(userName || null);
+        setTokenPreview(res.token.slice(0,24)+'...');
+        setUsername(userName || '(not logged in)'); // fixed usage
+        await fetchProducts();
+      } else throw new Error('No token');
     }catch(e){ console.error(e); alert('Login failed'); }
   }
 
   function logout(){ setToken(null); setUser(null); setTokenPreview('(none)'); setUsername('(not logged in)'); }
 
-  function addToCart(product){ setCart(prev => { const copy = {...prev}; if(!copy[product.id]) copy[product.id] = { product, qty:0 }; copy[product.id].qty += 1; return copy; }); }
-  function inc(id){ setCart(prev => { const copy = {...prev}; if(copy[id]) copy[id].qty += 1; return copy; }); }
-  function dec(id){ setCart(prev => { const copy = {...prev}; if(copy[id]){ copy[id].qty = Math.max(0, copy[id].qty - 1); if(copy[id].qty === 0) delete copy[id]; } return copy; }); }
+ function addToCart(product) {
+   setCart(prev => {
+     const copy = { ...prev };
+     const existing = copy[product.id];
+     if (existing) {
+       // clone the inner object to avoid mutating existing reference
+       copy[product.id] = { ...existing, qty: existing.qty + 1 };
+     } else {
+       copy[product.id] = { product, qty: 1 };
+     }
+     return copy;
+   });
+ }
 
+ function inc(id) {
+   setCart(prev => {
+     const copy = { ...prev };
+     if (copy[id]) {
+       const item = copy[id];
+       copy[id] = { ...item, qty: item.qty + 1 }; // clone inner object
+     }
+     return copy;
+   });
+ }
+
+ function dec(id) {
+   setCart(prev => {
+     const copy = { ...prev };
+     if (copy[id]) {
+       const item = copy[id];
+       const newQty = item.qty - 1;
+       if (newQty > 0) {
+         copy[id] = { ...item, qty: newQty };
+       } else {
+         delete copy[id];
+       }
+     }
+     return copy;
+   });
+ }
   function clearCart(){ setCart({}); }
 
   function computeTotals(){
@@ -60,16 +104,14 @@ export default function App(){
       const taxRate = Number(ci.product.taxRate ?? 0);
 
       sub += price * ci.qty;
-      gst += price * taxRate/100 * ci.qty; // accumulate numeric value
+      gst += price * taxRate/100 * ci.qty;
     });
 
-    // round to 2 decimals for display/calculation
     const tax = Math.round(gst * 100) / 100;
     const grand = Math.round((sub + tax) * 100) / 100;
 
     return { sub, tax, grand };
   }
-
 
   async function saveCart(){
     try{
@@ -77,7 +119,10 @@ export default function App(){
       if(items.length === 0) return alert('Cart empty');
       const payload = { username: null, sessionId: getSession(), items };
       const res = await api.saveCart(payload);
-      if(res && res.id){ setSavedCartId(res.id); setSavedCartIdState(res.id); }
+      if(res && res.id){
+        setSavedCartId(res.id);
+        setSavedCartIdState(res.id);
+      }
     }catch(e){ console.error(e); alert('Save cart failed'); }
   }
 
@@ -152,10 +197,25 @@ export default function App(){
 
   const totals = computeTotals();
 
+  // Header that uses tokenPreview and savedCartId so ESLint won't flag them unused
+  function Header(){
+    return (
+      <header className="app-header" style={{display:'flex',alignItems:'center',gap:12,padding:12,background:'#111827',color:'#fff',borderRadius:8}}>
+        <img src={logo} alt="Logo" style={{height:48,width:'auto'}} />
+        <div>
+          <div style={{fontSize:18,fontWeight:700}}>POS — Token persistence & immediate products fetch</div>
+          <div style={{fontSize:12,opacity:0.9}}>
+            {username} &nbsp; • &nbsp; Token: {tokenPreview} &nbsp; • &nbsp; SavedCart: {String(savedCartId)}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
-    <div className="wrap">
-      <div className="top">
-        <h2>POS — Token persistence & immediate products fetch</h2>
+    <div className="wrap" style={{padding:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+        <Header />
         <div style={{marginLeft:'auto',display:'flex',gap:12,alignItems:'center'}}>
           <div>
             <label style={{display:'block',fontSize:12}}>API Host</label>
@@ -177,9 +237,8 @@ export default function App(){
         </div>
       </div>
 
-
-      <div className="grid">
-        <div className="panel">
+      <div className="grid" style={{display:'grid',gridTemplateColumns:'1fr 360px',gap:12}}>
+        <div className="panel" style={{padding:12,borderRadius:8,background:'#fff'}}>
           <h3 style={{marginTop:0}}>Products</h3>
           <div style={{marginBottom:8}} className="row">
             <button onClick={fetchProducts}>Refresh</button>
@@ -192,7 +251,7 @@ export default function App(){
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel" style={{padding:12,borderRadius:8,background:'#fff'}}>
           <h3 style={{marginTop:0}}>Cart</h3>
           <div id="cartContainer" style={{minHeight:120}}>
             <Cart cart={cart} onInc={inc} onDec={dec} />
