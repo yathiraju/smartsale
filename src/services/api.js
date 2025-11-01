@@ -8,12 +8,27 @@ export const STORAGE_KEYS = {
 
 let tokenCache = localStorage.getItem(STORAGE_KEYS.TOKEN) || null;
 
-export function getApiHost(){ return localStorage.getItem(STORAGE_KEYS.API_HOST) || 'http://localhost:8080'; }
+export function getApiHost(){
+return process.env.REACT_APP_API_HOST || 'http://localhost:8080';
+ }
 export function setApiHost(h){ localStorage.setItem(STORAGE_KEYS.API_HOST, h); }
 export function getToken(){ return tokenCache || localStorage.getItem(STORAGE_KEYS.TOKEN); }
 export function setToken(t){ tokenCache = t; if(t){ localStorage.setItem(STORAGE_KEYS.TOKEN, t); } else { localStorage.removeItem(STORAGE_KEYS.TOKEN); } }
 export function setUser(u){ if(u){ localStorage.setItem(STORAGE_KEYS.USER, u); } else { localStorage.removeItem(STORAGE_KEYS.USER); } }
-export function getSession(){ let s = localStorage.getItem(STORAGE_KEYS.SESSION); if(!s){ s = 'sess_' + Math.random().toString(36).slice(2,12); localStorage.setItem(STORAGE_KEYS.SESSION, s);} return s; }
+export function getSession() {
+  let s = localStorage.getItem(STORAGE_KEYS.SESSION);
+  if (!s) {
+    s = generateSecureId();
+    localStorage.setItem(STORAGE_KEYS.SESSION, s);
+  }
+  return s;
+}
+export function generateSecureId() {
+         return 'sess_' + ([1e7]+-1e3+-4e3+-8e3+-1e11)
+           .replace(/[018]/g, c =>
+             ((c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16))
+           );
+       }
 export function setSavedCartId(id){ if(id){ localStorage.setItem(STORAGE_KEYS.CART_ID, id); } else { localStorage.removeItem(STORAGE_KEYS.CART_ID); } }
 export function getSavedCartId(){ return localStorage.getItem(STORAGE_KEYS.CART_ID); }
 
