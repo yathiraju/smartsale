@@ -5,15 +5,31 @@ import Cart from './components/Cart';
 import logo from './logo.svg';
 import './App.css';
 
+const CART_LS_KEY = 'mobile_pos_cart_v1';
+
 export default function App(){
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
-  // keep tokenPreview and savedCartId because build failed with them unused
-  const [tokenPreview, setTokenPreview] = useState(getToken() ? (getToken().slice(0,24) + '...') : '(none)');
+  // eslint-disable-next-line no-unused-vars
   const [username, setUsername] = useState(localStorage.getItem('rzp_username') || '(not logged in)');
+  // eslint-disable-next-line no-unused-vars
   const [savedCartId, setSavedCartIdState] = useState(getSavedCartId() || '(none)');
 
-  useEffect(() => { fetchProducts(); }, []);
+  // load products and cart from localStorage on mount
+  useEffect(() => {
+    fetchProducts();
+    try {
+      const raw = localStorage.getItem(CART_LS_KEY);
+      if (raw) setCart(JSON.parse(raw));
+    } catch(e) { console.warn('Failed to parse cart from localStorage', e); }
+  }, []);
+
+  // persist cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_LS_KEY, JSON.stringify(cart));
+    } catch(e) { console.warn('Failed to save cart to localStorage', e); }
+  }, [cart]);
 
   async function fetchProducts(){
     try{
@@ -22,7 +38,6 @@ export default function App(){
       else setProducts([]);
     } catch(e){ console.error(e); alert('Could not fetch products'); }
   }
-
 
   async function login(){
     const userInput = document.getElementById('login-username');
@@ -40,55 +55,54 @@ export default function App(){
       if(res && res.token){
         setToken(res.token);
         setUser(userName || null);
-        setTokenPreview(res.token.slice(0,24)+'...');
-        setUsername(userName || '(not logged in)'); // fixed usage
+        setUsername(userName || '(not logged in)');
         await fetchProducts();
       } else throw new Error('No token');
     }catch(e){ console.error(e); alert('Login failed'); }
   }
 
-  function logout(){ setToken(null); setUser(null); setTokenPreview('(none)'); setUsername('(not logged in)'); }
+  function logout(){ setToken(null); setUser(null);  setUsername('(not logged in)'); }
 
- function addToCart(product) {
-   setCart(prev => {
-     const copy = { ...prev };
-     const existing = copy[product.id];
-     if (existing) {
-       // clone the inner object to avoid mutating existing reference
-       copy[product.id] = { ...existing, qty: existing.qty + 1 };
-     } else {
-       copy[product.id] = { product, qty: 1 };
-     }
-     return copy;
-   });
- }
+  function addToCart(product) {
+    setCart(prev => {
+      const copy = { ...prev };
+      const existing = copy[product.id];
+      if (existing) {
+        copy[product.id] = { ...existing, qty: existing.qty + 1 };
+      } else {
+        copy[product.id] = { product, qty: 1 };
+      }
+      return copy;
+    });
+  }
 
- function inc(id) {
-   setCart(prev => {
-     const copy = { ...prev };
-     if (copy[id]) {
-       const item = copy[id];
-       copy[id] = { ...item, qty: item.qty + 1 }; // clone inner object
-     }
-     return copy;
-   });
- }
+  function inc(id) {
+    setCart(prev => {
+      const copy = { ...prev };
+      if (copy[id]) {
+        const item = copy[id];
+        copy[id] = { ...item, qty: item.qty + 1 };
+      }
+      return copy;
+    });
+  }
 
- function dec(id) {
-   setCart(prev => {
-     const copy = { ...prev };
-     if (copy[id]) {
-       const item = copy[id];
-       const newQty = item.qty - 1;
-       if (newQty > 0) {
-         copy[id] = { ...item, qty: newQty };
-       } else {
-         delete copy[id];
-       }
-     }
-     return copy;
-   });
- }
+  function dec(id) {
+    setCart(prev => {
+      const copy = { ...prev };
+      if (copy[id]) {
+        const item = copy[id];
+        const newQty = item.qty - 1;
+        if (newQty > 0) {
+          copy[id] = { ...item, qty: newQty };
+        } else {
+          delete copy[id];
+        }
+      }
+      return copy;
+    });
+  }
+
   function clearCart(){ setCart({}); }
 
   function computeTotals(){
@@ -193,16 +207,32 @@ export default function App(){
 
   const totals = computeTotals();
 
-  // Header that uses tokenPreview and savedCartId so ESLint won't flag them unused
+  // derive total count for badge
+  const totalItemsCount = Object.values(cart).reduce((sum, it) => sum + (it.qty || 0), 0);
+
   function Header(){
     return (
       <header className="app-header" style={{display:'flex',alignItems:'center',gap:12,padding:12,background:'#111827',color:'#fff',borderRadius:8}}>
-        <img src={logo} alt="Logo" style={{height:48,width:'auto'}} />
-        <div>
-          <div style={{fontSize:18,fontWeight:700}}>POS — Token persistence & immediate products fetch</div>
-          <div style={{fontSize:12,opacity:0.9}}>
-            {username} &nbsp; • &nbsp; Token: {tokenPreview} &nbsp; • &nbsp; SavedCart: {String(savedCartId)}
-          </div>
+        <div style={{position:'relative',display:'inline-block'}}>
+          <img src={logo} alt="Logo" style={{height:48,width:'auto'}} />
+          { totalItemsCount > 0 && (
+            <span style={{
+              position:'absolute',
+              right:-6,
+              top:-6,
+              minWidth:20,
+              height:20,
+              padding:'0 6px',
+              borderRadius:10,
+              display:'inline-flex',
+              alignItems:'center',
+              justifyContent:'center',
+              background:'#ef4444',
+              color:'#fff',
+              fontSize:12,
+              fontWeight:700
+            }}>{totalItemsCount}</span>
+          )}
         </div>
       </header>
     );
