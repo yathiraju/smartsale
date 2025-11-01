@@ -26,12 +26,19 @@ export default function App(){
       }
 
   async function login(){
-    const u = prompt('Username', 'admin');
-    const p = prompt('Password', 'admin123');
-    if(!u || !p) return;
+       const userInput = document.getElementById('login-username');
+       const passwordInput = document.getElementById('login-password');
+
+       if (!userInput || !passwordInput) {
+         alert('Login fields not found in DOM');
+         return;
+       }
+
+   const userName =userInput.value.trim();
+   const password =passwordInput.value.trim();
     try{
-      const res = await api.login(u,p);
-      if(res && res.token){ setToken(res.token); setUser(res.username || null); setTokenPreview(res.token.slice(0,24)+'...'); setUsername(res.username || u); await fetchProducts(); }
+      const res = await api.login(userName,password);
+      if(res && res.token){ setToken(res.token); setUser(userName || null); setTokenPreview(res.token.slice(0,24)+'...'); setUsername(username); await fetchProducts(); }
       else throw new Error('No token');
     }catch(e){ console.error(e); alert('Login failed'); }
   }
@@ -158,11 +165,11 @@ export default function App(){
           <div className="panel" style={{padding:8,borderRadius:8,display:'flex',gap:8,alignItems:'center'}}>
             <div>
               <label style={{fontSize:12,display:'block'}}>Username</label>
-              <input defaultValue="admin" style={{width:140}} />
+              <input id="login-username" defaultValue="" style={{width:140}} />
             </div>
             <div>
               <label style={{fontSize:12,display:'block'}}>Password</label>
-              <input type="password" defaultValue="admin123" style={{width:160}} />
+              <input id="login-password" type="password" defaultValue="" style={{width:160}} />
             </div>
             <div><button onClick={login}>Login</button></div>
             <div><button onClick={logout} style={{background:'#e53e3e'}}>Logout</button></div>
@@ -170,11 +177,6 @@ export default function App(){
         </div>
       </div>
 
-      <div style={{marginTop:8,display:'flex',gap:12,alignItems:'center'}}>
-        <div className="muted">Logged in as: <span>{username}</span></div>
-        <div className="muted">Token: <span>{tokenPreview}</span></div>
-        <div className="muted">Saved Cart Id: <span>{savedCartId}</span></div>
-      </div>
 
       <div className="grid">
         <div className="panel">
