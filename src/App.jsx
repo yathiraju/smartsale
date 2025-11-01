@@ -42,7 +42,25 @@ export default function App(){
 
   function clearCart(){ setCart({}); }
 
-  function computeTotals(){ let sub = 0; Object.values(cart).forEach(ci => { const price = Number(ci.product.salePrice != null ? ci.product.salePrice : ci.product.price || 0); sub += price * ci.qty; }); const tax = +(sub * 0.18).toFixed(2); const grand = +(sub + tax).toFixed(2); return { sub, tax, grand } }
+  function computeTotals(){
+    let sub = 0;
+    let gst = 0;
+
+    Object.values(cart).forEach(ci => {
+      const price = Number(ci.product.salePrice ?? ci.product.price ?? 0);
+      const taxRate = Number(ci.product.taxRate ?? 0);
+
+      sub += price * ci.qty;
+      gst += price * taxRate/100 * ci.qty; // accumulate numeric value
+    });
+
+    // round to 2 decimals for display/calculation
+    const tax = Math.round(gst * 100) / 100;
+    const grand = Math.round((sub + tax) * 100) / 100;
+
+    return { sub, tax, grand };
+  }
+
 
   async function saveCart(){
     try{
