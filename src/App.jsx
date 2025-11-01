@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { api, getApiHost, setApiHost, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession } from './services/api';
+import { api, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession } from './services/api';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import logo from './logo.svg';
 import './App.css';
 
 export default function App(){
-  const [apiHost, setHost] = useState(getApiHost());
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
   // keep tokenPreview and savedCartId because build failed with them unused
@@ -24,9 +23,6 @@ export default function App(){
     } catch(e){ console.error(e); alert('Could not fetch products'); }
   }
 
-  function saveHostClicked(){
-    setApiHost(apiHost);
-  }
 
   async function login(){
     const userInput = document.getElementById('login-username');
@@ -217,11 +213,6 @@ export default function App(){
       <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
         <Header />
         <div style={{marginLeft:'auto',display:'flex',gap:12,alignItems:'center'}}>
-          <div>
-            <label style={{display:'block',fontSize:12}}>API Host</label>
-            <input style={{width:280}} value={apiHost} onChange={e => setHost(e.target.value)} />
-          </div>
-          <button onClick={saveHostClicked}>Save Host</button>
           <div className="panel" style={{padding:8,borderRadius:8,display:'flex',gap:8,alignItems:'center'}}>
             <div>
               <label style={{fontSize:12,display:'block'}}>Username</label>
