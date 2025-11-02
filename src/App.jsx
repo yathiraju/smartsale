@@ -297,7 +297,7 @@ export default function App(){
         </div>
 
         <div className="panel" style={{padding:12,borderRadius:8,background:'#fff'}}>
-          <h3 style={{marginTop:0}}>Cart</h3>
+          <h3 style={{marginTop:0}}>Cart 🛒 </h3>
           <div id="cartContainer" style={{minHeight:120}}>
             <Cart cart={cart} onInc={inc} onDec={dec} />
           </div>
@@ -327,7 +327,7 @@ export default function App(){
                     onClick={clearCart}
                     disabled={totalItemsCount === 0}
                   >
-                    🗑️ Clear Cart
+                    Clear Cart 🛒️
                   </button>
                   </div>
                   <div style={{ gap:12 }}>
@@ -335,7 +335,7 @@ export default function App(){
                     onClick={pay}
                     disabled={paying || totalItemsCount === 0}
                   >
-                    {paying ? 'Processing…' : '💳 Pay'}
+                    {paying ? 'Processing…' : 'Pay 💳'}
                   </button>
                 </div>
               </div>
