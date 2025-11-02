@@ -286,9 +286,9 @@ export default function App(){
         <div className="panel" style={{padding:12,borderRadius:8,background:'#fff'}}>
           <h3 style={{marginTop:0}}>Products</h3>
           <div style={{marginBottom:8}} className="row">
-            <button onClick={fetchProducts}>Refresh</button>
-            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{background:'#805ad5'}}>Test Auth</button>
-            <button onClick={loadActiveCart} style={{background:'#4a5568'}}>Load Active Cart</button>
+            <button onClick={fetchProducts}>Dry Fruits</button>
+            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{background:'#805ad5'}}>Cloths</button>
+            <button onClick={loadActiveCart} style={{background:'#4a5568'}}>Electronics</button>
 
           </div>
           <div className="products">
