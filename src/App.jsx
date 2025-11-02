@@ -289,7 +289,7 @@ export default function App(){
             <button onClick={fetchProducts}>Refresh</button>
             <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{background:'#805ad5'}}>Test Auth</button>
             <button onClick={loadActiveCart} style={{background:'#4a5568'}}>Load Active Cart</button>
-            <button onClick={clearCart} style={{background:'#e53e3e'}}>Clear Cart</button>
+
           </div>
           <div className="products">
             {products.length === 0 ? <div className="muted">No products (or access denied)</div> : products.map(p => <ProductCard p={p} key={p.id} onAdd={addToCart} />)}
@@ -307,19 +307,39 @@ export default function App(){
               <div><strong>Tax:</strong> ₹<span>{totals.tax.toFixed(2)}</span></div>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
-              <div><strong>Grand Total:</strong> ₹<span>{totals.grand.toFixed(2)}</span></div>
-              <div>
-                <button onClick={pay} disabled={paying || totalItemsCount === 0} style={{
-                  marginLeft:8,
-                  background: paying ? '#9ca3af' : '#2f855a',
-                  color:'#fff',
-                  padding:'6px 10px',
-                  borderRadius:6,
-                  cursor: paying ? 'not-allowed' : 'pointer'
-                }}>
-                  {paying ? 'Processing…' : 'Pay'}
-                </button>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 12,
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div style={{ fontSize: 15 }}>
+                  <strong>Grand Total:</strong> ₹<span>{totals.grand.toFixed(2)}</span>
+                </div>
+
+                <div style={{ gap:12 }}>
+                  <button
+                    className="cart-button cart-button--danger"
+                    onClick={clearCart}
+                    disabled={totalItemsCount === 0}
+                  >
+                    🗑️ Clear Cart
+                  </button>
+                  </div>
+                  <div style={{ gap:12 }}>
+                  <button
+                    onClick={pay}
+                    disabled={paying || totalItemsCount === 0}
+                  >
+                    {paying ? 'Processing…' : '💳 Pay'}
+                  </button>
+                </div>
               </div>
+
             </div>
           </div>
         </div>
