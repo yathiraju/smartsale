@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// App.jsx
+import React, { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { api, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession } from './services/api';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
@@ -10,13 +11,25 @@ const CART_LS_KEY = 'mobile_pos_cart_v1';
 export default function App(){
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
-  // keep these states but don't show them — disable ESLint warnings so CI won't fail
-  // eslint-disable-next-line no-unused-vars
-  const [username, setUsername] = useState(localStorage.getItem('rzp_username') || '(not logged in)');
+  // keep this for compatibility with other code but we won't render it directly
   // eslint-disable-next-line no-unused-vars
   const [savedCartId, setSavedCartIdState] = useState(getSavedCartId() || '(none)');
 
+  // display-only username (set after successful login)
+  const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
+
+  // uncontrolled inputs (refs) to avoid cursor loss
+  const usernameRef = useRef(null);
+  const passwordRef = useRef(null);
+
   const [paying, setPaying] = useState(false);
+
+  // logged-in state determined by token presence
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
+
+  // user's orders (shown when logged in)
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   // load products and cart from localStorage on mount
   useEffect(() => {
@@ -25,6 +38,9 @@ export default function App(){
       const raw = localStorage.getItem(CART_LS_KEY);
       if (raw) setCart(JSON.parse(raw));
     } catch(e) { console.warn('Failed to parse cart from localStorage', e); }
+
+    if (isLoggedIn) fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // persist cart to localStorage whenever it changes
@@ -42,29 +58,67 @@ export default function App(){
     } catch(e){ console.error(e); alert('Could not fetch products'); }
   }
 
-  async function login(){
-    const userInput = document.getElementById('login-username');
-    const passwordInput = document.getElementById('login-password');
+  // Try a couple of likely API method names for orders for resilience
+  const fetchOrders = useCallback(async () => {
+    if (!isLoggedIn) return;
+    setOrdersLoading(true);
+    try {
+      let res = null;
+      if (typeof api.getOrders === 'function') {
+        res = await api.getOrders();
+      } else if (typeof api.orders === 'function') {
+        res = await api.orders();
+      } else if (typeof api.fetchOrders === 'function') {
+        res = await api.fetchOrders();
+      } else {
+        console.warn('No known orders method on api object');
+      }
 
-    if (!userInput || !passwordInput) {
-      alert('Login fields not found in DOM');
-      return;
+      if (Array.isArray(res)) setOrders(res);
+      else if (res && Array.isArray(res.orders)) setOrders(res.orders);
+      else setOrders([]);
+    } catch (e) {
+      console.error('Fetch orders failed', e);
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
     }
+  }, [isLoggedIn]);
 
-    const userName = userInput.value.trim();
-    const password = passwordInput.value.trim();
+  // LOGIN uses refs (uncontrolled) — won't interfere with keystrokes
+  async function login(){
+    const userName = String(usernameRef.current?.value || '').trim();
+    const pwd = String(passwordRef.current?.value || '').trim();
+    if(!userName || !pwd) return alert('Please enter username and password');
+
     try{
-      const res = await api.login(userName, password);
+      const res = await api.login(userName, pwd);
       if(res && res.token){
         setToken(res.token);
         setUser(userName || null);
-        setUsername(userName || '(not logged in)');
+        try { localStorage.setItem('rzp_username', userName); } catch(_) {}
+        setUsernameDisplay(userName);
+        setIsLoggedIn(true);
+
         await fetchProducts();
+        await fetchOrders();
+        try { await loadActiveCart(); } catch(_) {}
       } else throw new Error('No token');
     }catch(e){ console.error(e); alert('Login failed'); }
+    finally {
+      // clear password ref after attempt for safety
+      if (passwordRef.current) passwordRef.current.value = '';
+    }
   }
 
-  function logout(){ setToken(null); setUser(null); setUsername('(not logged in)'); }
+  function logout(){
+    setToken(null);
+    setUser(null);
+    setIsLoggedIn(false);
+    setOrders([]);
+    setUsernameDisplay('');
+    try { localStorage.removeItem('rzp_username'); } catch(_) {}
+  }
 
   function addToCart(product) {
     setCart(prev => {
@@ -147,6 +201,7 @@ export default function App(){
 
   async function loadActiveCart(){
     try{
+      if (typeof api.loadActiveCart !== 'function') return;
       const res = await api.loadActiveCart();
       if(res && Array.isArray(res.items)){
         const newCart = {};
@@ -159,30 +214,33 @@ export default function App(){
     }catch(e){ console.error(e); alert('Load active cart failed'); }
   }
 
+  // load an order's items into the cart (simple replacement)
+  function loadOrderIntoCart(order) {
+    if (!order || !Array.isArray(order.items)) return alert('Order has no items to load');
+    const newCart = {};
+    order.items.forEach(it => {
+      const prod = products.find(p => p.id === it.productId) || { id: it.productId, name: it.name || 'Item #' + it.productId, price: it.price || it.priceAtAdd || 0 };
+      newCart[prod.id] = { product: prod, qty: it.quantity };
+    });
+    setCart(newCart);
+  }
+
   // pay() performs a single save (if needed) then triggers the payment flow.
   async function pay(){
     if (paying) return;
     setPaying(true);
     try{
-      // Ensure cart not empty and get a saved cart id (saveCart returns saved response)
       const savedResp = await saveCart();
-      if(!savedResp || !savedResp.id) {
-        // saveCart will alert on empty; just bail out
-        setPaying(false);
-        return;
-      }
+      if(!savedResp || !savedResp.id) { setPaying(false); return; }
       const cartId = savedResp.id;
 
-      // compute amount
       const { grand } = computeTotals();
       const amountPaise = Math.round(grand * 100);
 
-      // create app order id
       const appOrderId = await api.createAppOrder();
       const appId = appOrderId && (appOrderId.orderId || appOrderId.id || appOrderId.order_id);
       if(!appId) throw new Error('No app order id');
 
-      // create payment order (Razorpay)
       const order = await api.createPaymentOrder({ amount: amountPaise, currency: 'INR', orderId: appId, receipt: 'order_' + appId });
 
       await loadRazorpayScript();
@@ -192,7 +250,7 @@ export default function App(){
         amount: order.amount,
         currency: order.currency,
         order_id: order.providerOrderId,
-        name: 'POS Shop',
+        name: 'Shop At Low price',
         description: 'Payment for order ' + appId,
         handler: async function(response){
           try{
@@ -230,113 +288,149 @@ export default function App(){
   }
 
   const totals = computeTotals();
-
-  // derive total count for badge
   const totalItemsCount = Object.values(cart).reduce((sum, it) => sum + (it.qty || 0), 0);
 
-  function Header(){
+  // stable callback to scroll to orders
+  const goToOrders = useCallback(() => {
+    const el = document.getElementById('ordersSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+    else fetchOrders();
+  }, [fetchOrders]); // fetchOrders is stable here (declared above)
+
+  // Memoized Header to reduce unnecessary re-renders
+  const Header = memo(function HeaderComponent(){
     return (
-      <header className="app-header" style={{display:'flex',alignItems:'center',gap:12,padding:12,background:'#111827',color:'#fff',borderRadius:8}}>
-        <div style={{position:'relative',display:'inline-block'}}>
-          <img src={logo} alt="Logo" style={{height:48,width:'auto'}} />
-          { totalItemsCount > 0 && (
-            <span style={{
-              position:'absolute',
-              right:-6,
-              top:-6,
-              minWidth:20,
-              height:20,
-              padding:'0 6px',
-              borderRadius:10,
-              display:'inline-flex',
-              alignItems:'center',
-              justifyContent:'center',
-              background:'#ef4444',
-              color:'#fff',
-              fontSize:12,
-              fontWeight:700
-            }}>{totalItemsCount}</span>
+      <header
+        className="app-header"
+        style={{
+          display:'flex',
+          alignItems:'center',
+          justifyContent:'space-between',
+          gap:12,
+          padding:12,
+          background:'#111827',
+          color:'#fff',
+          borderRadius:8,
+          position:'relative'
+        }}
+      >
+        {/* LEFT: logo region */}
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <img src={logo} alt="Logo" style={{ height:48, width:'auto', userSelect:'none' }} />
+          <div style={{ fontSize:18, fontWeight:700 }}>Shop At Low Price</div>
+        </div>
+
+        {/* RIGHT: top-right controls */}
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          {isLoggedIn && (
+            <button
+              onClick={goToOrders}
+              style={{ background: '#2563eb', color: '#fff', padding: '8px 12px', borderRadius: 6 }}
+            >
+              Orders {orders && orders.length > 0 ? `(${orders.length})` : ''}
+            </button>
           )}
+
+          <div style={{ display:'flex', gap:8, alignItems:'center', padding:8, borderRadius:8, background: isLoggedIn ? 'transparent' : '#f3f4f6' }}>
+            {!isLoggedIn ? (
+              <>
+                <div>
+                  <label style={{ fontSize:12, display:'block', color:'#111' }}>Username</label>
+                  {/* uncontrolled input with defaultValue */}
+                  <input id="login-username" ref={usernameRef} defaultValue={usernameDisplay} style={{ width:160, padding:6 }} autoComplete="username" />
+                </div>
+
+                <div>
+                  <label style={{ fontSize:12, display:'block', color:'#111' }}>Password</label>
+                  {/* uncontrolled input with empty defaultValue */}
+                  <input id="login-password" ref={passwordRef} type="password" defaultValue="" style={{ width:160, padding:6 }} autoComplete="current-password" />
+                </div>
+
+                <div>
+                  <button onClick={login} style={{ padding: '8px 12px' }}>Login</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize:14, color:'#fff', marginRight:8 }}>
+                  Signed in as <strong style={{ marginLeft:6 }}>{usernameDisplay || '(you)'}</strong>
+                </div>
+                <button onClick={logout} style={{ background:'#e53e3e', color:'#fff', padding: '8px 12px', borderRadius: 6 }}>Logout</button>
+              </>
+            )}
+          </div>
         </div>
       </header>
     );
-  }
+  });
 
   return (
-    <div className="wrap" style={{padding:12}}>
-      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+    <div className="wrap" style={{ padding:12 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
         <Header />
-        <div style={{marginLeft:'auto',display:'flex',gap:12,alignItems:'center'}}>
-          <div className="panel" style={{padding:8,borderRadius:8,display:'flex',gap:8,alignItems:'center'}}>
-            <div>
-              <label style={{fontSize:12,display:'block'}}>Username</label>
-              <input id="login-username" defaultValue="" style={{width:140}} />
-            </div>
-            <div>
-              <label style={{fontSize:12,display:'block'}}>Password</label>
-              <input id="login-password" type="password" defaultValue="" style={{width:160}} />
-            </div>
-            <div><button onClick={login}>Login</button></div>
-            <div><button onClick={logout} style={{background:'#e53e3e'}}>Logout</button></div>
-          </div>
-        </div>
       </div>
 
-      <div className="grid" style={{display:'grid',gridTemplateColumns:'1fr 360px',gap:12}}>
-        <div className="panel" style={{padding:12,borderRadius:8,background:'#fff'}}>
-          <h3 style={{marginTop:0}}>Products</h3>
-          <div style={{marginBottom:8}} className="row">
-            <button onClick={fetchProducts}>Dry Fruits</button>
-            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{background:'#805ad5'}}>Cloths</button>
-            <button onClick={loadActiveCart} style={{background:'#4a5568'}}>Electronics</button>
+      <div className="grid" style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:12 }}>
+        <div className="panel" style={{ padding:12, borderRadius:8, background:'#fff' }}>
+          <h3 style={{ marginTop:0 }}>Products</h3>
 
+          {/* If logged in and there are orders, render Orders section above products */}
+          {isLoggedIn && orders && orders.length > 0 && (
+            <div id="ordersSection" style={{ marginBottom:12, padding:12, borderRadius:8, background:'#f8fafc' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <strong>Your Orders</strong>
+                <button onClick={fetchOrders} disabled={ordersLoading}>{ordersLoading ? 'Refreshing…' : 'Refresh'}</button>
+              </div>
+              <div style={{ maxHeight:220, overflow:'auto' }}>
+                {orders.map(o => (
+                  <div key={o.id || o.orderId} style={{ padding:8, borderRadius:8, marginBottom:8, border:'1px solid #e6e6e6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div>
+                      <div><strong>Order #{o.id || o.orderId}</strong></div>
+                      <div style={{ fontSize:12, color:'#666' }}>{o.status || (o.state ? o.state : '')} • {o.items ? o.items.length : (o.itemCount || 0)} items</div>
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => loadOrderIntoCart(o)}>Load to cart</button>
+                      <button onClick={() => { navigator.clipboard?.writeText(String(o.id || o.orderId)); alert('Order id copied'); }}>Copy ID</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginBottom:8 }} className="row">
+            <button onClick={fetchProducts}>Dry Fruits</button>
+            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{ background:'#805ad5' }}>Cloths</button>
+            <button onClick={loadActiveCart} style={{ background:'#4a5568' }}>Electronics</button>
           </div>
+
           <div className="products">
             {products.length === 0 ? <div className="muted">No products (or access denied)</div> : products.map(p => <ProductCard p={p} key={p.id} onAdd={addToCart} />)}
           </div>
         </div>
 
-        <div className="panel" style={{padding:12,borderRadius:8,background:'#fff'}}>
-          <h3 style={{marginTop:0}}>Cart 🛒 </h3>
-          <div id="cartContainer" style={{minHeight:120}}>
+        <div className="panel" style={{ padding:12, borderRadius:8, background:'#fff' }}>
+          <h3 style={{ marginTop:0 }}>Cart 🛒 </h3>
+          <div id="cartContainer" style={{ minHeight:120 }}>
             <Cart cart={cart} onInc={inc} onDec={dec} />
           </div>
-          <div style={{marginTop:8}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+
+          <div style={{ marginTop:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div><strong>Subtotal:</strong> ₹<span>{totals.sub.toFixed(2)}</span></div>
               <div><strong>Tax:</strong> ₹<span>{totals.tax.toFixed(2)}</span></div>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: 12,
-                  flexWrap: 'wrap',
-                  gap: 12,
-                }}
-              >
+
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 12 }}>
                 <div style={{ fontSize: 15 }}>
                   <strong>Grand Total:</strong> ₹<span>{totals.grand.toFixed(2)}</span>
                 </div>
 
-                <div style={{ gap:12 }}>
-                  <button
-                    className="cart-button cart-button--danger"
-                    onClick={clearCart}
-                    disabled={totalItemsCount === 0}
-                  >
-                    Clear Cart 🛒️
-                  </button>
-                  </div>
-                  <div style={{ gap:12 }}>
-                  <button
-                    onClick={pay}
-                    disabled={paying || totalItemsCount === 0}
-                  >
-                    {paying ? 'Processing…' : 'Pay 💳'}
-                  </button>
+                <div style={{ gap:12, display:'flex', alignItems:'center' }}>
+                  <button className="cart-button cart-button--danger" onClick={clearCart} disabled={totalItemsCount === 0}>Clear Cart 🛒️</button>
+
+                  <button onClick={pay} disabled={paying || totalItemsCount === 0}>{paying ? 'Processing…' : 'Pay 💳'}</button>
                 </div>
               </div>
 
@@ -344,7 +438,6 @@ export default function App(){
           </div>
         </div>
       </div>
-
     </div>
   );
 }
