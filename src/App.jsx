@@ -188,7 +188,7 @@ export default function App(){
       await loadRazorpayScript();
 
       const options = {
-        key: process.env.RZP_KEY,
+        key: process.env.REACT_APP_RZP_KEY,
         amount: order.amount,
         currency: order.currency,
         order_id: order.providerOrderId,
