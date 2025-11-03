@@ -188,7 +188,7 @@ export default function App(){
         alert('Cart empty');
         return null;
       }
-      const payload = { username: null, sessionId: getSession(), items };
+      const payload = { username: localStorage.getItem("rzp_username"), sessionId: getSession(), items };
       const res = await api.saveCart(payload);
       if(res && res.id){
         try { setSavedCartId(res.id); } catch(_) { /* ignore if service setter not used */ }
