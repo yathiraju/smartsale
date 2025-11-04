@@ -1,6 +1,6 @@
-// App.jsx
+// App.jsx (updated with Signup form)
 import React, { useEffect, useState, useRef, useCallback, memo } from 'react';
-import { api, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession } from './services/api';
+import { api, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession, getApiHost } from './services/api';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import logo from './logo.svg';
@@ -11,11 +11,7 @@ const CART_LS_KEY = 'mobile_pos_cart_v1';
 export default function App(){
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
-  // keep this for compatibility with other code but we won't render it directly
-  // eslint-disable-next-line no-unused-vars
   const [savedCartId, setSavedCartIdState] = useState(getSavedCartId() || '(none)');
-
-  // display-only username (set after successful login)
   const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
 
   // uncontrolled inputs (refs) to avoid cursor loss
@@ -23,15 +19,18 @@ export default function App(){
   const passwordRef = useRef(null);
 
   const [paying, setPaying] = useState(false);
-
-  // logged-in state determined by token presence
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
-
-  // user's orders (shown when logged in)
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
 
-  // load products and cart from localStorage on mount
+  // Signup modal state + controlled inputs for signup
+  const [showSignup, setShowSignup] = useState(false);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupData, setSignupData] = useState({
+    username: '', email: '', password: '', role: 'USER',
+    name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '', country: 'IN', lat: '', lng: ''
+  });
+
   useEffect(() => {
     fetchProducts();
     try {
@@ -43,11 +42,8 @@ export default function App(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // persist cart to localStorage whenever it changes
   useEffect(() => {
-    try {
-      localStorage.setItem(CART_LS_KEY, JSON.stringify(cart));
-    } catch(e) { console.warn('Failed to save cart to localStorage', e); }
+    try { localStorage.setItem(CART_LS_KEY, JSON.stringify(cart)); } catch(e){ console.warn('Failed to save cart to localStorage', e); }
   }, [cart]);
 
   async function fetchProducts(){
@@ -58,7 +54,6 @@ export default function App(){
     } catch(e){ console.error(e); alert('Could not fetch products'); }
   }
 
-  // Try a couple of likely API method names for orders for resilience
   const fetchOrders = useCallback(async () => {
     if (!isLoggedIn) return;
     setOrdersLoading(true);
@@ -70,8 +65,6 @@ export default function App(){
         res = await api.orders();
       } else if (typeof api.fetchOrders === 'function') {
         res = await api.fetchOrders();
-      } else {
-        console.warn('No known orders method on api object');
       }
 
       if (Array.isArray(res)) setOrders(res);
@@ -85,7 +78,6 @@ export default function App(){
     }
   }, [isLoggedIn]);
 
-  // LOGIN uses refs (uncontrolled) — won't interfere with keystrokes
   async function login(){
     const userName = String(usernameRef.current?.value || '').trim();
     const pwd = String(passwordRef.current?.value || '').trim();
@@ -105,10 +97,7 @@ export default function App(){
         try { await loadActiveCart(); } catch(_) {}
       } else throw new Error('No token');
     }catch(e){ console.error(e); alert('Login failed'); }
-    finally {
-      // clear password ref after attempt for safety
-      if (passwordRef.current) passwordRef.current.value = '';
-    }
+    finally { if (passwordRef.current) passwordRef.current.value = ''; }
   }
 
   function logout(){
@@ -163,35 +152,26 @@ export default function App(){
   function clearCart(){ setCart({}); }
 
   function computeTotals(){
-    let sub = 0;
-    let gst = 0;
-
+    let sub = 0; let gst = 0;
     Object.values(cart).forEach(ci => {
       const price = Number(ci.product.salePrice ?? ci.product.price ?? 0);
       const taxRate = Number(ci.product.taxRate ?? 0);
-
       sub += price * ci.qty;
       gst += price * taxRate/100 * ci.qty;
     });
-
     const tax = Math.round(gst * 100) / 100;
     const grand = Math.round((sub + tax) * 100) / 100;
-
     return { sub, tax, grand };
   }
 
-  // Modified saveCart: returns response (or null) so callers can use the saved ID
   async function saveCart(){
     try{
       const items = Object.values(cart).map(ci => ({ productId: Number(ci.product.id), quantity: Number(ci.qty), priceAtAdd: Number((ci.product.price || ci.product.salePrice || 0)) }));
-      if(items.length === 0) {
-        alert('Cart empty');
-        return null;
-      }
+      if(items.length === 0) { alert('Cart empty'); return null; }
       const payload = { username: localStorage.getItem("rzp_username"), sessionId: getSession(), items };
       const res = await api.saveCart(payload);
       if(res && res.id){
-        try { setSavedCartId(res.id); } catch(_) { /* ignore if service setter not used */ }
+        try { setSavedCartId(res.id); } catch(_) { }
         setSavedCartIdState(res.id);
         return res;
       }
@@ -200,21 +180,15 @@ export default function App(){
   }
 
   async function loadActiveCart(){
-    try{
-      if (typeof api.loadActiveCart !== 'function') return;
-      const res = await api.loadActiveCart();
+    try{ if (typeof api.loadActiveCart !== 'function') return; const res = await api.loadActiveCart();
       if(res && Array.isArray(res.items)){
         const newCart = {};
-        res.items.forEach(it => {
-          const prod = products.find(p => p.id === it.productId);
-          if(prod) newCart[prod.id] = { product: prod, qty: it.quantity };
-        });
+        res.items.forEach(it => { const prod = products.find(p => p.id === it.productId); if(prod) newCart[prod.id] = { product: prod, qty: it.quantity }; });
         setCart(newCart);
       }
     }catch(e){ console.error(e); alert('Load active cart failed'); }
   }
 
-  // load an order's items into the cart (simple replacement)
   function loadOrderIntoCart(order) {
     if (!order || !Array.isArray(order.items)) return alert('Order has no items to load');
     const newCart = {};
@@ -225,55 +199,28 @@ export default function App(){
     setCart(newCart);
   }
 
-  // pay() performs a single save (if needed) then triggers the payment flow.
   async function pay(){
-    if (paying) return;
-    setPaying(true);
+    if (paying) return; setPaying(true);
     try{
-      const savedResp = await saveCart();
-      if(!savedResp || !savedResp.id) { setPaying(false); return; }
+      const savedResp = await saveCart(); if(!savedResp || !savedResp.id) { setPaying(false); return; }
       const cartId = savedResp.id;
-
-      const { grand } = computeTotals();
-      const amountPaise = Math.round(grand * 100);
-
+      const { grand } = computeTotals(); const amountPaise = Math.round(grand * 100);
       const appOrderId = await api.createAppOrder();
       const appId = appOrderId && (appOrderId.orderId || appOrderId.id || appOrderId.order_id);
       if(!appId) throw new Error('No app order id');
-
       const order = await api.createPaymentOrder({ amount: amountPaise, currency: 'INR', orderId: appId, receipt: 'order_' + appId });
-
       await loadRazorpayScript();
-
-      const options = {
-        key: process.env.REACT_APP_RZP_KEY,
-        amount: order.amount,
-        currency: order.currency,
-        order_id: order.providerOrderId,
-        name: 'Shop At Low price',
-        description: 'Payment for order ' + appId,
+      const options = { key: process.env.REACT_APP_RZP_KEY, amount: order.amount, currency: order.currency, order_id: order.providerOrderId, name: 'Shop At Low price', description: 'Payment for order ' + appId,
         handler: async function(response){
-          try{
-            const captureBody = Object.assign({}, response, { orderId: appId, cartId: cartId });
-            const cap = await api.capturePayment(captureBody);
-            if (cap && String(cap.status).toLowerCase() === 'paid'){
-              alert('Payment captured successfully');
-              setCart({}); setSavedCartId(null); setSavedCartIdState('(none)');
-            } else alert('Capture failed');
+          try{ const captureBody = Object.assign({}, response, { orderId: appId, cartId: cartId }); const cap = await api.capturePayment(captureBody);
+            if (cap && String(cap.status).toLowerCase() === 'paid'){ alert('Payment captured successfully'); setCart({}); setSavedCartId(null); setSavedCartIdState('(none)'); } else alert('Capture failed');
           }catch(e){ console.error(e); alert('Capture failed'); }
         }
       };
-
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function(err){ console.error('payment failed', err); alert('Payment failed: ' + (err.error && err.error.description)); });
       rzp.open();
-
-    }catch(e){
-      console.error('Pay failed', e);
-      alert('Payment flow failed: ' + (e.message || e));
-    } finally {
-      setPaying(false);
-    }
+    }catch(e){ console.error('Pay failed', e); alert('Payment flow failed: ' + (e.message || e)); } finally { setPaying(false); }
   }
 
   function loadRazorpayScript(){
@@ -290,45 +237,23 @@ export default function App(){
   const totals = computeTotals();
   const totalItemsCount = Object.values(cart).reduce((sum, it) => sum + (it.qty || 0), 0);
 
-  // stable callback to scroll to orders
   const goToOrders = useCallback(() => {
     const el = document.getElementById('ordersSection');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
     else fetchOrders();
-  }, [fetchOrders]); // fetchOrders is stable here (declared above)
+  }, [fetchOrders]);
 
-  // Memoized Header to reduce unnecessary re-renders
   const Header = memo(function HeaderComponent(){
     return (
-      <header
-        className="app-header"
-        style={{
-          display:'flex',
-          alignItems:'center',
-          justifyContent:'space-between',
-          gap:12,
-          padding:12,
-          background:'#111827',
-          color:'#fff',
-          borderRadius:8,
-          position:'relative'
-        }}
-      >
-        {/* LEFT: logo region */}
+      <header className="app-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:12, background:'#111827', color:'#fff', borderRadius:8, position:'relative' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <img src={logo} alt="Logo" style={{ height:48, width:'auto', userSelect:'none' }} />
           <div style={{ fontSize:18, fontWeight:700 }}>Shop At Low Price</div>
         </div>
 
-        {/* RIGHT: top-right controls */}
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           {isLoggedIn && (
-            <button
-              onClick={goToOrders}
-              style={{ background: '#2563eb', color: '#fff', padding: '8px 12px', borderRadius: 6 }}
-            >
-              Orders {orders && orders.length > 0 ? `(${orders.length})` : ''}
-            </button>
+            <button onClick={goToOrders} style={{ background: '#2563eb', color: '#fff', padding: '8px 12px', borderRadius: 6 }}>Orders {orders && orders.length > 0 ? `(${orders.length})` : ''}</button>
           )}
 
           <div style={{ display:'flex', gap:8, alignItems:'center', padding:8, borderRadius:8, background: isLoggedIn ? 'transparent' : '#f3f4f6' }}>
@@ -336,33 +261,79 @@ export default function App(){
               <>
                 <div>
                   <label style={{ fontSize:12, display:'block', color:'#111' }}>Username</label>
-                  {/* uncontrolled input with defaultValue */}
                   <input id="login-username" ref={usernameRef} defaultValue={usernameDisplay} style={{ width:160, padding:6 }} autoComplete="username" />
                 </div>
 
                 <div>
                   <label style={{ fontSize:12, display:'block', color:'#111' }}>Password</label>
-                  {/* uncontrolled input with empty defaultValue */}
                   <input id="login-password" ref={passwordRef} type="password" defaultValue="" style={{ width:160, padding:6 }} autoComplete="current-password" />
                 </div>
 
                 <div>
                   <button onClick={login} style={{ padding: '8px 12px' }}>Login</button>
                 </div>
+
+                {/* Signup button: shown before login, disabled after login (controlled by isLoggedIn) */}
+                <div>
+                  <button onClick={() => setShowSignup(true)} disabled={isLoggedIn} style={{ padding: '8px 12px', background:'#10b981', color:'#fff', borderRadius:6 }}>Sign up</button>
+                </div>
               </>
             ) : (
               <>
-                <div style={{ fontSize:14, color:'#fff', marginRight:8 }}>
-                  Signed in as <strong style={{ marginLeft:6 }}>{usernameDisplay || '(you)'}</strong>
-                </div>
+                <div style={{ fontSize:14, color:'#fff', marginRight:8 }}>Signed in as <strong style={{ marginLeft:6 }}>{usernameDisplay || '(you)'}</strong></div>
                 <button onClick={logout} style={{ background:'#e53e3e', color:'#fff', padding: '8px 12px', borderRadius: 6 }}>Logout</button>
               </>
             )}
           </div>
         </div>
+
       </header>
     );
   });
+
+  // Signup form submit handler
+  async function signupSubmit(e){
+    e?.preventDefault?.();
+    if (signupLoading) return;
+    // basic validation
+    if(!signupData.username || !signupData.email || !signupData.password) return alert('Please provide username, email and password');
+
+    setSignupLoading(true);
+    try{
+      // build payload to match UserAddressDTO
+      const payload = {
+        users: { username: signupData.username, password: signupData.password, email: signupData.email, role: signupData.role },
+        name: signupData.name,
+        phone: signupData.phone,
+        line1: signupData.line1,
+        line2: signupData.line2,
+        city: signupData.city,
+        state: signupData.state,
+        pincode: signupData.pincode,
+        country: signupData.country || 'IN',
+        lat: signupData.lat ? Number(signupData.lat) : null,
+        lng: signupData.lng ? Number(signupData.lng) : null
+      };
+
+      const host = getApiHost().replace(/\/$/, '');
+      const resRaw = await fetch(host + '/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      let res;
+      try{ res = await resRaw.json(); }catch(e){ res = await resRaw.text(); }
+      if(resRaw.ok){
+        alert('Signup successful. You can now log in.');
+        setShowSignup(false);
+        // optional: prefill username field
+        if(usernameRef.current) usernameRef.current.value = signupData.username;
+      } else {
+        console.error('Signup error', res);
+        alert('Signup failed: ' + (res && res.message ? res.message : JSON.stringify(res)));
+      }
+
+    }catch(e){ console.error(e); alert('Signup request failed'); }
+    finally { setSignupLoading(false); }
+  }
+
+  function signupFieldChange(k, v){ setSignupData(prev => ({ ...prev, [k]: v })); }
 
   return (
     <div className="wrap" style={{ padding:12 }}>
@@ -374,7 +345,6 @@ export default function App(){
         <div className="panel" style={{ padding:12, borderRadius:8, background:'#fff' }}>
           <h3 style={{ marginTop:0 }}>Products</h3>
 
-          {/* If logged in and there are orders, render Orders section above products */}
           {isLoggedIn && orders && orders.length > 0 && (
             <div id="ordersSection" style={{ marginBottom:12, padding:12, borderRadius:8, background:'#f8fafc' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -429,7 +399,6 @@ export default function App(){
 
                 <div style={{ gap:12, display:'flex', alignItems:'center' }}>
                   <button className="cart-button cart-button--danger" onClick={clearCart} disabled={totalItemsCount === 0}>Clear Cart 🛒️</button>
-
                   <button onClick={pay} disabled={paying || totalItemsCount === 0}>{paying ? 'Processing…' : 'Pay 💳'}</button>
                 </div>
               </div>
@@ -438,6 +407,46 @@ export default function App(){
           </div>
         </div>
       </div>
+
+      {/* Signup modal (simple inline modal) */}
+      {showSignup && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <form onSubmit={signupSubmit} style={{ width:720, maxWidth:'95%', background:'#fff', padding:16, borderRadius:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <h3 style={{ margin:0 }}>Sign up</h3>
+              <div>
+                <button type="button" onClick={() => setShowSignup(false)} style={{ padding:'6px 10px' }}>Close</button>
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <input placeholder="Username*" value={signupData.username} onChange={e => signupFieldChange('username', e.target.value)} />
+              <input placeholder="Email*" value={signupData.email} onChange={e => signupFieldChange('email', e.target.value)} />
+              <input placeholder="Password*" type="password" value={signupData.password} onChange={e => signupFieldChange('password', e.target.value)} />
+              <input placeholder="Role (optional)" value={signupData.role} onChange={e => signupFieldChange('role', e.target.value)} />
+
+              <input placeholder="Full name" value={signupData.name} onChange={e => signupFieldChange('name', e.target.value)} />
+              <input placeholder="Phone" value={signupData.phone} onChange={e => signupFieldChange('phone', e.target.value)} />
+              <input placeholder="Address line 1" value={signupData.line1} onChange={e => signupFieldChange('line1', e.target.value)} />
+              <input placeholder="Address line 2" value={signupData.line2} onChange={e => signupFieldChange('line2', e.target.value)} />
+
+              <input placeholder="City" value={signupData.city} onChange={e => signupFieldChange('city', e.target.value)} />
+              <input placeholder="State" value={signupData.state} onChange={e => signupFieldChange('state', e.target.value)} />
+              <input placeholder="Pincode" value={signupData.pincode} onChange={e => signupFieldChange('pincode', e.target.value)} />
+              <input placeholder="Country" value={signupData.country} onChange={e => signupFieldChange('country', e.target.value)} />
+
+              <input placeholder="Latitude" value={signupData.lat} onChange={e => signupFieldChange('lat', e.target.value)} />
+              <input placeholder="Longitude" value={signupData.lng} onChange={e => signupFieldChange('lng', e.target.value)} />
+            </div>
+
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:12 }}>
+              <button type="button" onClick={() => setShowSignup(false)} disabled={signupLoading}>Cancel</button>
+              <button type="submit" disabled={signupLoading} style={{ background:'#10b981', color:'#fff', padding:'8px 12px', borderRadius:6 }}>{signupLoading ? 'Signing…' : 'Create account'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }
