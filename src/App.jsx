@@ -1,452 +1,222 @@
-// App.jsx (updated with Signup form)
-import React, { useEffect, useState, useRef, useCallback, memo } from 'react';
-import { api, getToken, setToken, setUser, getSavedCartId, setSavedCartId, getSession, getApiHost } from './services/api';
-import ProductCard from './components/ProductCard';
-import Cart from './components/Cart';
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
 
-const CART_LS_KEY = 'mobile_pos_cart_v1';
+// Flipkart-like single-file React component preview
+// Tailwind CSS required. This file exports a default React component you can drop into a project.
 
-export default function App(){
-  const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState({});
-  const [savedCartId, setSavedCartIdState] = useState(getSavedCartId() || '(none)');
-  const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
+const sampleProducts = Array.from({ length: 12 }).map((_, i) => ({
+  id: i + 1,
+  title: `Product ${i + 1} — Smart gadget with great specs`,
+  price: (999 + i * 150).toFixed(0),
+  originalPrice: (1499 + i * 180).toFixed(0),
+  rating: (3.8 + (i % 3) * 0.4).toFixed(1),
+  image: `https://via.placeholder.com/300x300?text=Prod+${i + 1}`,
+  badge: i % 4 === 0 ? 'Deal of the Day' : i % 5 === 0 ? 'Limited' : null,
+}));
 
-  // uncontrolled inputs (refs) to avoid cursor loss
-  const usernameRef = useRef(null);
-  const passwordRef = useRef(null);
-
-  const [paying, setPaying] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
-  const [orders, setOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-
-  // Signup modal state + controlled inputs for signup
-  const [showSignup, setShowSignup] = useState(false);
-  const [signupLoading, setSignupLoading] = useState(false);
-  const [signupData, setSignupData] = useState({
-    username: '', email: '', password: '', role: 'USER',
-    name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '', country: 'IN', lat: '', lng: ''
-  });
-
-  useEffect(() => {
-    fetchProducts();
-    try {
-      const raw = localStorage.getItem(CART_LS_KEY);
-      if (raw) setCart(JSON.parse(raw));
-    } catch(e) { console.warn('Failed to parse cart from localStorage', e); }
-
-    if (isLoggedIn) fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem(CART_LS_KEY, JSON.stringify(cart)); } catch(e){ console.warn('Failed to save cart to localStorage', e); }
-  }, [cart]);
-
-  async function fetchProducts(){
-    try{
-      const res = await api.products();
-      if(Array.isArray(res)) setProducts(res);
-      else setProducts([]);
-    } catch(e){ console.error(e); alert('Could not fetch products'); }
-  }
-
-  const fetchOrders = useCallback(async () => {
-    if (!isLoggedIn) return;
-    setOrdersLoading(true);
-    try {
-      let res = null;
-      if (typeof api.getOrders === 'function') {
-        res = await api.getOrders();
-      } else if (typeof api.orders === 'function') {
-        res = await api.orders();
-      } else if (typeof api.fetchOrders === 'function') {
-        res = await api.fetchOrders();
-      }
-
-      if (Array.isArray(res)) setOrders(res);
-      else if (res && Array.isArray(res.orders)) setOrders(res.orders);
-      else setOrders([]);
-    } catch (e) {
-      console.error('Fetch orders failed', e);
-      setOrders([]);
-    } finally {
-      setOrdersLoading(false);
-    }
-  }, [isLoggedIn]);
-
-  async function login(){
-    const userName = String(usernameRef.current?.value || '').trim();
-    const pwd = String(passwordRef.current?.value || '').trim();
-    if(!userName || !pwd) return alert('Please enter username and password');
-
-    try{
-      const res = await api.login(userName, pwd);
-      if(res && res.token){
-        setToken(res.token);
-        setUser(userName || null);
-        try { localStorage.setItem('rzp_username', userName); } catch(_) {}
-        setUsernameDisplay(userName);
-        setIsLoggedIn(true);
-
-        await fetchProducts();
-        await fetchOrders();
-        try { await loadActiveCart(); } catch(_) {}
-      } else throw new Error('No token');
-    }catch(e){ console.error(e); alert('Login failed'); }
-    finally { if (passwordRef.current) passwordRef.current.value = ''; }
-  }
-
-  function logout(){
-    setToken(null);
-    setUser(null);
-    setIsLoggedIn(false);
-    setOrders([]);
-    setUsernameDisplay('');
-    try { localStorage.removeItem('rzp_username'); } catch(_) {}
-  }
-
-  function addToCart(product) {
-    setCart(prev => {
-      const copy = { ...prev };
-      const existing = copy[product.id];
-      if (existing) {
-        copy[product.id] = { ...existing, qty: existing.qty + 1 };
-      } else {
-        copy[product.id] = { product, qty: 1 };
-      }
-      return copy;
-    });
-  }
-
-  function inc(id) {
-    setCart(prev => {
-      const copy = { ...prev };
-      if (copy[id]) {
-        const item = copy[id];
-        copy[id] = { ...item, qty: item.qty + 1 };
-      }
-      return copy;
-    });
-  }
-
-  function dec(id) {
-    setCart(prev => {
-      const copy = { ...prev };
-      if (copy[id]) {
-        const item = copy[id];
-        const newQty = item.qty - 1;
-        if (newQty > 0) {
-          copy[id] = { ...item, qty: newQty };
-        } else {
-          delete copy[id];
-        }
-      }
-      return copy;
-    });
-  }
-
-  function clearCart(){ setCart({}); }
-
-  function computeTotals(){
-    let sub = 0; let gst = 0;
-    Object.values(cart).forEach(ci => {
-      const price = Number(ci.product.salePrice ?? ci.product.price ?? 0);
-      const taxRate = Number(ci.product.taxRate ?? 0);
-      sub += price * ci.qty;
-      gst += price * taxRate/100 * ci.qty;
-    });
-    const tax = Math.round(gst * 100) / 100;
-    const grand = Math.round((sub + tax) * 100) / 100;
-    return { sub, tax, grand };
-  }
-
-  async function saveCart(){
-    try{
-      const items = Object.values(cart).map(ci => ({ productId: Number(ci.product.id), quantity: Number(ci.qty), priceAtAdd: Number((ci.product.price || ci.product.salePrice || 0)) }));
-      if(items.length === 0) { alert('Cart empty'); return null; }
-      const payload = { username: localStorage.getItem("rzp_username"), sessionId: getSession(), items };
-      const res = await api.saveCart(payload);
-      if(res && res.id){
-        try { setSavedCartId(res.id); } catch(_) { }
-        setSavedCartIdState(res.id);
-        return res;
-      }
-      return res || null;
-    }catch(e){ console.error(e); alert('Save cart failed'); return null; }
-  }
-
-  async function loadActiveCart(){
-    try{ if (typeof api.loadActiveCart !== 'function') return; const res = await api.loadActiveCart();
-      if(res && Array.isArray(res.items)){
-        const newCart = {};
-        res.items.forEach(it => { const prod = products.find(p => p.id === it.productId); if(prod) newCart[prod.id] = { product: prod, qty: it.quantity }; });
-        setCart(newCart);
-      }
-    }catch(e){ console.error(e); alert('Load active cart failed'); }
-  }
-
-  function loadOrderIntoCart(order) {
-    if (!order || !Array.isArray(order.items)) return alert('Order has no items to load');
-    const newCart = {};
-    order.items.forEach(it => {
-      const prod = products.find(p => p.id === it.productId) || { id: it.productId, name: it.name || 'Item #' + it.productId, price: it.price || it.priceAtAdd || 0 };
-      newCart[prod.id] = { product: prod, qty: it.quantity };
-    });
-    setCart(newCart);
-  }
-
-  async function pay(){
-    if (paying) return; setPaying(true);
-    try{
-      const savedResp = await saveCart(); if(!savedResp || !savedResp.id) { setPaying(false); return; }
-      const cartId = savedResp.id;
-      const { grand } = computeTotals(); const amountPaise = Math.round(grand * 100);
-      const appOrderId = await api.createAppOrder();
-      const appId = appOrderId && (appOrderId.orderId || appOrderId.id || appOrderId.order_id);
-      if(!appId) throw new Error('No app order id');
-      const order = await api.createPaymentOrder({ amount: amountPaise, currency: 'INR', orderId: appId, receipt: 'order_' + appId });
-      await loadRazorpayScript();
-      const options = { key: process.env.REACT_APP_RZP_KEY, amount: order.amount, currency: order.currency, order_id: order.providerOrderId, name: 'Shop At Low price', description: 'Payment for order ' + appId,
-        handler: async function(response){
-          try{ const captureBody = Object.assign({}, response, { orderId: appId, cartId: cartId }); const cap = await api.capturePayment(captureBody);
-            if (cap && String(cap.status).toLowerCase() === 'paid'){ alert('Payment captured successfully'); setCart({}); setSavedCartId(null); setSavedCartIdState('(none)'); } else alert('Capture failed');
-          }catch(e){ console.error(e); alert('Capture failed'); }
-        }
-      };
-      const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', function(err){ console.error('payment failed', err); alert('Payment failed: ' + (err.error && err.error.description)); });
-      rzp.open();
-    }catch(e){ console.error('Pay failed', e); alert('Payment flow failed: ' + (e.message || e)); } finally { setPaying(false); }
-  }
-
-  function loadRazorpayScript(){
-    return new Promise((resolve, reject) => {
-      if(window.Razorpay) return resolve();
-      const s = document.createElement('script');
-      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('Razorpay script load failed'));
-      document.body.appendChild(s);
-    });
-  }
-
-  const totals = computeTotals();
-  const totalItemsCount = Object.values(cart).reduce((sum, it) => sum + (it.qty || 0), 0);
-
-  const goToOrders = useCallback(() => {
-    const el = document.getElementById('ordersSection');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-    else fetchOrders();
-  }, [fetchOrders]);
-
-  const Header = memo(function HeaderComponent(){
-    return (
-      <header className="app-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:12, background:'#111827', color:'#fff', borderRadius:8, position:'relative' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <img src={logo} alt="Logo" style={{ height:48, width:'auto', userSelect:'none' }} />
-          <div style={{ fontSize:18, fontWeight:700 }}>Shop At Low Price</div>
-        </div>
-
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          {isLoggedIn && (
-            <button onClick={goToOrders} style={{ background: '#2563eb', color: '#fff', padding: '8px 12px', borderRadius: 6 }}>Orders {orders && orders.length > 0 ? `(${orders.length})` : ''}</button>
-          )}
-
-          <div style={{ display:'flex', gap:8, alignItems:'center', padding:8, borderRadius:8, background: isLoggedIn ? 'transparent' : '#f3f4f6' }}>
-            {!isLoggedIn ? (
-              <>
-                <div>
-                  <label style={{ fontSize:12, display:'block', color:'#111' }}>Username</label>
-                  <input id="login-username" ref={usernameRef} defaultValue={usernameDisplay} style={{ width:160, padding:6 }} autoComplete="username" />
-                </div>
-
-                <div>
-                  <label style={{ fontSize:12, display:'block', color:'#111' }}>Password</label>
-                  <input id="login-password" ref={passwordRef} type="password" defaultValue="" style={{ width:160, padding:6 }} autoComplete="current-password" />
-                </div>
-
-                <div>
-                  <button onClick={login} style={{ padding: '8px 12px' }}>Login</button>
-                </div>
-
-                {/* Signup button: shown before login, disabled after login (controlled by isLoggedIn) */}
-                <div>
-                  <button onClick={() => setShowSignup(true)} disabled={isLoggedIn} style={{ padding: '8px 12px', background:'#10b981', color:'#fff', borderRadius:6 }}>Sign up</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize:14, color:'#fff', marginRight:8 }}>Signed in as <strong style={{ marginLeft:6 }}>{usernameDisplay || '(you)'}</strong></div>
-                <button onClick={logout} style={{ background:'#e53e3e', color:'#fff', padding: '8px 12px', borderRadius: 6 }}>Logout</button>
-              </>
-            )}
-          </div>
-        </div>
-
-      </header>
-    );
-  });
-
-  // Signup form submit handler
-  async function signupSubmit(e){
-    e?.preventDefault?.();
-    if (signupLoading) return;
-    // basic validation
-    if(!signupData.username || !signupData.email || !signupData.password) return alert('Please provide username, email and password');
-
-    setSignupLoading(true);
-    try{
-      // build payload to match UserAddressDTO
-      const payload = {
-        users: { username: signupData.username, password: signupData.password, email: signupData.email, role: signupData.role },
-        name: signupData.name,
-        phone: signupData.phone,
-        line1: signupData.line1,
-        line2: signupData.line2,
-        city: signupData.city,
-        state: signupData.state,
-        pincode: signupData.pincode,
-        country: signupData.country || 'IN',
-        lat: signupData.lat ? Number(signupData.lat) : null,
-        lng: signupData.lng ? Number(signupData.lng) : null
-      };
-
-      const host = getApiHost().replace(/\/$/, '');
-      const resRaw = await fetch(host + '/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      let res;
-      try{ res = await resRaw.json(); }catch(e){ res = await resRaw.text(); }
-      if(resRaw.ok){
-        alert('Signup successful. You can now log in.');
-        setShowSignup(false);
-        // optional: prefill username field
-        if(usernameRef.current) usernameRef.current.value = signupData.username;
-      } else {
-        console.error('Signup error', res);
-        alert('Signup failed: ' + (res && res.message ? res.message : JSON.stringify(res)));
-      }
-
-    }catch(e){ console.error(e); alert('Signup request failed'); }
-    finally { setSignupLoading(false); }
-  }
-
-  function signupFieldChange(k, v){ setSignupData(prev => ({ ...prev, [k]: v })); }
-
+export default function FlipkartLikeUI() {
   return (
-    <div className="wrap" style={{ padding:12 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
-        <Header />
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      {/* Header */}
+      <header className="bg-blue-600 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-white rounded px-3 py-1 text-blue-600 font-bold">LOGO</div>
+              <div className="hidden sm:block text-sm">Deliver to Hyderabad</div>
+            </div>
+
+            <div className="flex-1">
+              <div className="flex">
+                <input
+                  type="text"
+                  placeholder="Search for products, brands and more"
+                  className="w-full rounded-l-md px-4 py-2 text-gray-700 focus:outline-none"
+                />
+                <button className="bg-yellow-400 text-black px-4 rounded-r-md font-semibold">Search</button>
+              </div>
+            </div>
+
+            <nav className="hidden md:flex items-center gap-6">
+              <button className="text-sm">Login</button>
+              <button className="text-sm">Become a Seller</button>
+              <button className="text-sm">More</button>
+              <button className="text-sm bg-white text-blue-600 px-3 py-1 rounded">Cart (2)</button>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Nav / Categories */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-4 overflow-x-auto py-3">
+            {['Electronics','Mobiles','Fashion','Home','Appliances','TVs & AV','Grocery','Beauty','Toys','Furniture'].map((c) => (
+              <button key={c} className="whitespace-nowrap px-3 py-1 rounded hover:bg-gray-100">{c}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="grid" style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:12 }}>
-        <div className="panel" style={{ padding:12, borderRadius:8, background:'#fff' }}>
-          <h3 style={{ marginTop:0 }}>Products</h3>
-
-          {isLoggedIn && orders && orders.length > 0 && (
-            <div id="ordersSection" style={{ marginBottom:12, padding:12, borderRadius:8, background:'#f8fafc' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                <strong>Your Orders</strong>
-                <button onClick={fetchOrders} disabled={ordersLoading}>{ordersLoading ? 'Refreshing…' : 'Refresh'}</button>
-              </div>
-              <div style={{ maxHeight:220, overflow:'auto' }}>
-                {orders.map(o => (
-                  <div key={o.id || o.orderId} style={{ padding:8, borderRadius:8, marginBottom:8, border:'1px solid #e6e6e6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div>
-                      <div><strong>Order #{o.id || o.orderId}</strong></div>
-                      <div style={{ fontSize:12, color:'#666' }}>{o.status || (o.state ? o.state : '')} • {o.items ? o.items.length : (o.itemCount || 0)} items</div>
-                    </div>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => loadOrderIntoCart(o)}>Load to cart</button>
-                      <button onClick={() => { navigator.clipboard?.writeText(String(o.id || o.orderId)); alert('Order id copied'); }}>Copy ID</button>
-                    </div>
+      {/* Main */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left filters */}
+        <aside className="hidden lg:block lg:col-span-1">
+          <div className="sticky top-20 space-y-4">
+            <div className="bg-white p-4 rounded shadow-sm">
+              <h3 className="font-semibold mb-2">Filters</h3>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <label className="block text-xs font-medium">Price</label>
+                  <div className="flex gap-2 mt-2">
+                    <input placeholder="Min" className="w-1/2 border px-2 py-1 rounded" />
+                    <input placeholder="Max" className="w-1/2 border px-2 py-1 rounded" />
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginBottom:8 }} className="row">
-            <button onClick={fetchProducts}>Dry Fruits</button>
-            <button onClick={async ()=>{ try{ const t = getToken(); if(!t) return alert('No token'); const res = await api.products(); console.log('test auth', res); }catch(e){ alert('Test Auth failed'); } }} style={{ background:'#805ad5' }}>Cloths</button>
-            <button onClick={loadActiveCart} style={{ background:'#4a5568' }}>Electronics</button>
-          </div>
-
-          <div className="products">
-            {products.length === 0 ? <div className="muted">No products (or access denied)</div> : products.map(p => <ProductCard p={p} key={p.id} onAdd={addToCart} />)}
-          </div>
-        </div>
-
-        <div className="panel" style={{ padding:12, borderRadius:8, background:'#fff' }}>
-          <h3 style={{ marginTop:0 }}>Cart 🛒 </h3>
-          <div id="cartContainer" style={{ minHeight:120 }}>
-            <Cart cart={cart} onInc={inc} onDec={dec} />
-          </div>
-
-          <div style={{ marginTop:8 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div><strong>Subtotal:</strong> ₹<span>{totals.sub.toFixed(2)}</span></div>
-              <div><strong>Tax:</strong> ₹<span>{totals.tax.toFixed(2)}</span></div>
-            </div>
-
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ fontSize: 15 }}>
-                  <strong>Grand Total:</strong> ₹<span>{totals.grand.toFixed(2)}</span>
                 </div>
-
-                <div style={{ gap:12, display:'flex', alignItems:'center' }}>
-                  <button className="cart-button cart-button--danger" onClick={clearCart} disabled={totalItemsCount === 0}>Clear Cart 🛒️</button>
-                  <button onClick={pay} disabled={paying || totalItemsCount === 0}>{paying ? 'Processing…' : 'Pay 💳'}</button>
+                <div>
+                  <label className="block text-xs font-medium">Brand</label>
+                  <div className="mt-2 space-y-1">
+                    <label className="flex items-center gap-2"><input type="checkbox"/> Boat</label>
+                    <label className="flex items-center gap-2"><input type="checkbox"/> Noise</label>
+                    <label className="flex items-center gap-2"><input type="checkbox"/> Samsung</label>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium">Customer Ratings</label>
+                  <div className="mt-2 space-y-1">
+                    <label className="flex items-center gap-2"><input type="radio" name="rating"/> 4★ & above</label>
+                    <label className="flex items-center gap-2"><input type="radio" name="rating"/> 3★ & above</label>
+                  </div>
                 </div>
               </div>
+            </div>
 
+            <div className="bg-white p-4 rounded shadow-sm">
+              <h4 className="font-semibold mb-2">Categories</h4>
+              <ul className="space-y-1 text-sm">
+                <li className="flex justify-between"><span>Mobiles</span><span>1256</span></li>
+                <li className="flex justify-between"><span>Headphones</span><span>892</span></li>
+                <li className="flex justify-between"><span>Smart Watches</span><span>412</span></li>
+              </ul>
+            </div>
+
+            <div className="bg-white p-4 rounded shadow-sm text-sm">
+              <h4 className="font-semibold mb-2">Offers</h4>
+              <p>Bank offers, Exchange offers, No-cost EMI and more.</p>
             </div>
           </div>
-        </div>
-      </div>
+        </aside>
 
-      {/* Signup modal (simple inline modal) */}
-      {showSignup && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
-          <form onSubmit={signupSubmit} style={{ width:720, maxWidth:'95%', background:'#fff', padding:16, borderRadius:8 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-              <h3 style={{ margin:0 }}>Sign up</h3>
+        {/* Right content */}
+        <section className="lg:col-span-3 space-y-6">
+          {/* Hero / Carousel */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 bg-gradient-to-r from-yellow-100 to-white rounded p-6 flex items-center justify-between">
               <div>
-                <button type="button" onClick={() => setShowSignup(false)} style={{ padding:'6px 10px' }}>Close</button>
+                <h2 className="text-2xl font-bold">Big Savings on Electronics</h2>
+                <p className="mt-2 text-sm">Up to 60% off — limited time deals on mobiles, TVs & more.</p>
+                <div className="mt-4 flex gap-3">
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded">Shop Now</button>
+                  <button className="border px-4 py-2 rounded">View Offers</button>
+                </div>
+              </div>
+              <img src="https://via.placeholder.com/260x160?text=Hero+Banner" alt="hero" className="hidden md:block rounded" />
+            </div>
+
+            <div className="bg-white p-4 rounded shadow-sm">
+              <h4 className="font-semibold mb-2">Flash Sale</h4>
+              <img src="https://via.placeholder.com/330x160?text=Flash+Sale" alt="flash" className="w-full rounded" />
+            </div>
+          </div>
+
+          {/* Sort & view controls */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm">Showing 1–24 of 5,432 results</div>
+            <div className="flex items-center gap-3">
+              <select className="border px-2 py-1 rounded">
+                <option>Relevance</option>
+                <option>Price: Low to High</option>
+                <option>Price: High to Low</option>
+                <option>Newest First</option>
+              </select>
+              <div className="flex items-center gap-2 text-sm">
+                <button className="px-2 py-1 border rounded">Grid</button>
+                <button className="px-2 py-1 border rounded">List</button>
               </div>
             </div>
+          </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              <input placeholder="Username*" value={signupData.username} onChange={e => signupFieldChange('username', e.target.value)} />
-              <input placeholder="Email*" value={signupData.email} onChange={e => signupFieldChange('email', e.target.value)} />
-              <input placeholder="Password*" type="password" value={signupData.password} onChange={e => signupFieldChange('password', e.target.value)} />
-              <input placeholder="Role (optional)" value={signupData.role} onChange={e => signupFieldChange('role', e.target.value)} />
+          {/* Products grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {sampleProducts.map((p) => (
+              <article key={p.id} className="bg-white p-3 rounded shadow-sm hover:shadow-md transition">
+                <div className="relative">
+                  {p.badge && (
+                    <span className="absolute top-2 left-2 bg-yellow-400 text-black text-xs px-2 py-1 rounded">{p.badge}</span>
+                  )}
+                  <img src={p.image} alt={p.title} className="w-full h-40 object-contain" />
+                </div>
+                <h3 className="mt-2 text-sm font-medium line-clamp-2">{p.title}</h3>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <div>
+                    <div className="font-bold">₹{p.price}</div>
+                    <div className="text-xs line-through text-gray-400">₹{p.originalPrice}</div>
+                  </div>
+                  <div className="text-xs bg-green-600 text-white px-2 py-1 rounded">{p.rating}★</div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button className="flex-1 border rounded py-1 text-sm">Add to Cart</button>
+                  <button className="w-10 border rounded py-1 text-sm">❤️</button>
+                </div>
+              </article>
+            ))}
+          </div>
 
-              <input placeholder="Full name" value={signupData.name} onChange={e => signupFieldChange('name', e.target.value)} />
-              <input placeholder="Phone" value={signupData.phone} onChange={e => signupFieldChange('phone', e.target.value)} />
-              <input placeholder="Address line 1" value={signupData.line1} onChange={e => signupFieldChange('line1', e.target.value)} />
-              <input placeholder="Address line 2" value={signupData.line2} onChange={e => signupFieldChange('line2', e.target.value)} />
-
-              <input placeholder="City" value={signupData.city} onChange={e => signupFieldChange('city', e.target.value)} />
-              <input placeholder="State" value={signupData.state} onChange={e => signupFieldChange('state', e.target.value)} />
-              <input placeholder="Pincode" value={signupData.pincode} onChange={e => signupFieldChange('pincode', e.target.value)} />
-              <input placeholder="Country" value={signupData.country} onChange={e => signupFieldChange('country', e.target.value)} />
-
-              <input placeholder="Latitude" value={signupData.lat} onChange={e => signupFieldChange('lat', e.target.value)} />
-              <input placeholder="Longitude" value={signupData.lng} onChange={e => signupFieldChange('lng', e.target.value)} />
+          {/* Pagination */}
+          <div className="flex items-center justify-center py-6">
+            <div className="inline-flex items-center gap-2">
+              <button className="px-3 py-1 border rounded">Prev</button>
+              <button className="px-3 py-1 border rounded bg-blue-600 text-white">1</button>
+              <button className="px-3 py-1 border rounded">2</button>
+              <button className="px-3 py-1 border rounded">3</button>
+              <button className="px-3 py-1 border rounded">Next</button>
             </div>
+          </div>
+        </section>
+      </main>
 
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:12 }}>
-              <button type="button" onClick={() => setShowSignup(false)} disabled={signupLoading}>Cancel</button>
-              <button type="submit" disabled={signupLoading} style={{ background:'#10b981', color:'#fff', padding:'8px 12px', borderRadius:6 }}>{signupLoading ? 'Signing…' : 'Create account'}</button>
+      {/* Footer */}
+      <footer className="bg-white border-t">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div>
+            <h4 className="font-semibold mb-2">About</h4>
+            <p className="text-sm">Short description about the shop. Customer care info, policies and more.</p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-2">Help</h4>
+            <ul className="text-sm space-y-1">
+              <li>Payments</li>
+              <li>Shipping</li>
+              <li>FAQ</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-2">Shop by Category</h4>
+            <ul className="text-sm space-y-1">
+              <li>Mobiles</li>
+              <li>Electronics</li>
+              <li>Home & Kitchen</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-2">Download App</h4>
+            <div className="space-y-2 text-sm">
+              <div className="border rounded px-3 py-2 inline-block">App Store</div>
+              <div className="border rounded px-3 py-2 inline-block">Google Play</div>
             </div>
-          </form>
+          </div>
         </div>
-      )}
-
+        <div className="text-center text-xs text-gray-500 py-4">© {new Date().getFullYear()} YourShop — Built with ❤️</div>
+      </footer>
     </div>
   );
 }
