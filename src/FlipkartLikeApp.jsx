@@ -1,265 +1,492 @@
-import React, { useEffect, useMemo, useState } from "react";
-// Wire-up to your existing services/api.js
-import { api, getSession, getToken, setToken, setUser } from "./services/api";
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { api, getToken, setToken, setUser, getSession } from './services/api';
+import ProductCard from './components/ProductCard';
+import Cart from './components/Cart';
+import './App.css';
 
-// --- helpers ---
-const fmtINR = (v) => {
-  const n = Number(v);
-  if (!isFinite(n)) return "—";
-  return n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-};
-const pickImage = (p) => p?.image || p?.thumbnail || p?.img || `https://via.placeholder.com/300x300?text=${encodeURIComponent(p?.name || p?.title || "Item")}`;
+// =======================================================
+// FlipkartLikeApp — Full Integrated POS + Flipkart UI
+// =======================================================
 
 export default function FlipkartLikeApp() {
-  // auth
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [authUser, setAuthUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
 
-  // catalog
+  // ----------------------------
+  // STATES
+  // ----------------------------
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [q, setQ] = useState("");
+  const [filtered, setFiltered] = useState([]);
+  const [search, setSearch] = useState('');
 
-  // cart
-  // items: { id, name, price, qty }
-  const [cart, setCart] = useState([]);
-  const cartCount = useMemo(() => cart.reduce((s, x) => s + x.qty, 0), [cart]);
-  const cartTotal = useMemo(() => cart.reduce((s, x) => s + Number(x.price || 0) * x.qty, 0), [cart]);
+  const [cart, setCart] = useState({});
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // ----- effects -----
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
+  const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
+
+  const usernameRef = useRef(null);
+  const passwordRef = useRef(null);
+
+  const [paying, setPaying] = useState(false);
+
+  const [showSignup, setShowSignup] = useState(false);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupData, setSignupData] = useState({
+    username: '', email: '', password: '', role: 'USER',
+    name: '', phone: '', line1: '', line2: '', city: '', state: '',
+    pincode: '', country: 'IN', lat: '', lng: ''
+  });
+
+  // ----------------------------
+  // EFFECTS
+  // ----------------------------
   useEffect(() => {
-    // initialize auth state from token
-    const t = getToken();
-    if (t) setAuthUser({ username: localStorage.getItem("rzp_username") || "user" });
+    fetchProducts();
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    setError("");
-    api
-      .products()
-      .then((list) => {
-        if (!mounted) return;
-        // Normalize product shape a bit to avoid undefined access
-        const normalized = (Array.isArray(list) ? list : list?.content || list?.items || []).map((p, i) => ({
-          id: p.id ?? p.productId ?? p.sku ?? i + 1,
-          name: p.name ?? p.title ?? p.productName ?? `Item ${i + 1}`,
-          price: p.price ?? p.unitPrice ?? p.mrp ?? 0,
-          originalPrice: p.originalPrice ?? p.mrp ?? p.price ?? 0,
-          rating: p.rating ?? p.avgRating ?? 4,
-          image: pickImage(p),
-          raw: p,
-        }));
-        setProducts(normalized);
-      })
-      .catch((e) => setError(typeof e === "string" ? e : e?.message || "Failed to load products"))
-      .finally(() => mounted && setLoading(false));
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    applySearch(search);
+  }, [search, products]);
 
-  // ----- handlers -----
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return products;
-    return products.filter((p) => [p.name, p.raw?.brand, p.raw?.category]
-      .filter(Boolean)
-      .some((s) => String(s).toLowerCase().includes(term)));
-  }, [products, q]);
+  // ----------------------------
+  // FETCH PRODUCTS
+  // ----------------------------
+  async function fetchProducts() {
+    try {
+      const res = await api.products();
+      const list = Array.isArray(res) ? res : [];
 
-  function addToCart(p) {
-    if (!authUser) {
-      setShowLogin(true);
+      // add placeholder image based on SKU
+      const mapped = list.map(p => ({
+        ...p,
+        image: `https://via.placeholder.com/300x300?text=${encodeURIComponent(p.sku || p.name || 'Product')}`
+      }));
+
+      setProducts(mapped);
+      setFiltered(mapped);
+    } catch (e) {
+      console.error(e);
+      alert('Cannot load products');
+    }
+  }
+
+  // ----------------------------
+  // SEARCH
+  // ----------------------------
+  function applySearch(q) {
+    const s = String(q).trim().toLowerCase();
+    if (!s) {
+      setFiltered(products);
       return;
     }
-    setCart((prev) => {
-      const idx = prev.findIndex((x) => x.id === p.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
-        return next;
+    setFiltered(products.filter(p =>
+      p.name.toLowerCase().includes(s) ||
+      (p.sku && p.sku.toLowerCase().includes(s))
+    ));
+  }
+
+  // ----------------------------
+  // LOGIN
+  // ----------------------------
+  async function login() {
+    const userName = String(usernameRef.current?.value || '').trim();
+    const pwd = String(passwordRef.current?.value || '').trim();
+    if (!userName || !pwd) return alert('Enter username and password');
+
+    try {
+      const res = await api.login(userName, pwd);
+      if (res && res.token) {
+        setToken(res.token);
+        setUser(userName);
+        localStorage.setItem('rzp_username', userName);
+        setUsernameDisplay(userName);
+        setIsLoggedIn(true);
+        await fetchProducts();
+      } else throw new Error('No token');
+    } catch (e) {
+      console.error(e);
+      alert('Login failed');
+    }
+  }
+
+  function logout() {
+    setToken(null);
+    setUser(null);
+    setIsLoggedIn(false);
+    setUsernameDisplay('');
+    try { localStorage.removeItem('rzp_username'); } catch (_) {}
+  }
+
+  // ----------------------------
+  // SIGNUP
+  // ----------------------------
+  async function signupSubmit(e) {
+    e.preventDefault();
+    if (signupLoading) return;
+
+    if (!signupData.username || !signupData.email || !signupData.password)
+      return alert('Provide username, email, password');
+
+    setSignupLoading(true);
+
+    try {
+      const payload = {
+        users: {
+          username: signupData.username,
+          password: signupData.password,
+          email: signupData.email,
+          role: signupData.role
+        },
+        name: signupData.name,
+        phone: signupData.phone,
+        line1: signupData.line1,
+        line2: signupData.line2,
+        city: signupData.city,
+        state: signupData.state,
+        pincode: signupData.pincode,
+        country: signupData.country,
+        lat: signupData.lat ? Number(signupData.lat) : null,
+        lng: signupData.lng ? Number(signupData.lng) : null
+      };
+
+      const host = api.getApiHost?.() || 'http://localhost:8080';
+      const resRaw = await fetch(host + '/api/signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      let res;
+      try { res = await resRaw.json(); }
+      catch { res = await resRaw.text(); }
+
+      if (resRaw.ok) {
+        alert('Signup successful. You can now log in.');
+        setShowSignup(false);
+        if (usernameRef.current) usernameRef.current.value = signupData.username;
+      } else {
+        alert('Signup failed: ' + (res?.message || JSON.stringify(res)));
       }
-      return [...prev, { id: p.id, name: p.name, price: p.price, qty: 1 }];
+
+    } catch (e) {
+      console.error(e);
+      alert('Signup request failed');
+    } finally {
+      setSignupLoading(false);
+    }
+  }
+
+  function signupFieldChange(k, v) {
+    setSignupData(prev => ({ ...prev, [k]: v }));
+  }
+
+  // ----------------------------
+  // CART LOGIC
+  // ----------------------------
+  function addToCart(product) {
+    setCart(prev => {
+      const copy = { ...prev };
+      const item = copy[product.id];
+      if (item) copy[product.id] = { product, qty: item.qty + 1 };
+      else copy[product.id] = { product, qty: 1 };
+      return copy;
     });
   }
 
-  async function persistCart() {
-    // Save cart to backend using your session id
-    try {
-      const payload = {
-        sessionId: getSession(),
-        items: cart.map((c) => ({ productId: c.id, quantity: c.qty, price: c.price })),
-      };
-      await api.saveCart(payload);
-    } catch (e) {
-      console.warn("saveCart failed", e);
-    }
+  function inc(id) {
+    setCart(prev => {
+      const c = { ...prev };
+      if (c[id]) c[id] = { ...c[id], qty: c[id].qty + 1 };
+      return c;
+    });
   }
 
-  useEffect(() => {
-    if (cart.length) {
-      persistCart();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart]);
-
-  async function doLogin(e) {
-    e?.preventDefault?.();
-    try {
-      const res = await api.login(username, password);
-      if (res?.token || res?.accessToken) {
-        setToken(res.token || res.accessToken);
-        setUser(username);
-        setAuthUser({ username });
-        setShowLogin(false);
+  function dec(id) {
+    setCart(prev => {
+      const c = { ...prev };
+      if (c[id]) {
+        const newQty = c[id].qty - 1;
+        if (newQty > 0) c[id] = { ...c[id], qty: newQty };
+        else delete c[id];
       }
-    } catch (e2) {
-      alert("Login failed: " + (e2?.message || e2));
-    }
+      return c;
+    });
   }
 
-  async function checkout() {
-    if (!authUser) {
-      setShowLogin(true);
-      return;
-    }
+  function clearCart() {
+    setCart({});
+  }
+
+  const totalItems = Object.values(cart).reduce((x, i) => x + i.qty, 0);
+
+  // ----------------------------
+  // GST + TOTALS
+  // ----------------------------
+  function computeTotals() {
+    let sub = 0, gst = 0;
+    Object.values(cart).forEach(ci => {
+      const p = ci.product;
+      const price = Number(p.salePrice ?? p.price ?? 0);
+      const taxRate = Number(p.taxRate ?? 0);
+      sub += price * ci.qty;
+      gst += price * (taxRate / 100) * ci.qty;
+    });
+    const tax = Math.round(gst * 100) / 100;
+    const grand = Math.round((sub + tax) * 100) / 100;
+    return { sub, tax, grand };
+  }
+  const totals = computeTotals();
+
+  // ----------------------------
+  // SAVE CART → CHECKOUT → RZP ORDER → PAYMENT
+  // ----------------------------
+
+  async function saveCart() {
     try {
-      // create the app order (ties to session/cart)
-      const order = await api.createAppOrder();
-      // optionally also create a payment order on your gateway
-      // const pay = await api.createPaymentOrder({ amount: Math.round(cartTotal) });
-      alert("Order created: " + JSON.stringify(order));
-      // Clear cart local state after successful creation
-      setCart([]);
+      const items = Object.values(cart).map(ci => ({
+        productId: ci.product.id,
+        quantity: ci.qty,
+        priceAtAdd: ci.product.salePrice ?? ci.product.price
+      }));
+      if (items.length === 0) return null;
+
+      const username = localStorage.getItem('rzp_username');
+      const payload = { username, sessionId: getSession(), items };
+
+      const res = await api.saveCart(payload);
+      return res;
     } catch (e) {
-      alert("Checkout failed: " + (e?.message || e));
+      console.error(e);
+      alert('Save cart failed');
+      return null;
     }
   }
 
-  // ----- UI -----
+  function loadRazorpayScript() {
+    return new Promise((resolve, reject) => {
+      if (window.Razorpay) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Razorpay failed'));
+      document.body.appendChild(s);
+    });
+  }
+
+  async function pay() {
+    if (paying) return;
+    setPaying(true);
+
+    try {
+      const saved = await saveCart();
+      if (!saved?.id) throw new Error('Cart not saved');
+
+      const cartId = saved.id;
+      const { grand } = totals;
+      const amountPaise = Math.round(grand * 100);
+
+      const appOrder = await api.createAppOrder();
+      const appId = appOrder?.orderId || appOrder?.id;
+      if (!appId) throw new Error('No internal order ID');
+
+      const rzpOrder = await api.createPaymentOrder({
+        amount: amountPaise,
+        currency: 'INR',
+        orderId: appId,
+        receipt: 'order_' + appId
+      });
+
+      await loadRazorpayScript();
+
+      const rzp = new window.Razorpay({
+        key: process.env.REACT_APP_RZP_KEY,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        order_id: rzpOrder.providerOrderId,
+        name: 'Shop At Low Price',
+        description: 'Order ' + appId,
+
+        handler: async (response) => {
+          try {
+            const body = { ...response, orderId: appId, cartId };
+            const cap = await api.capturePayment(body);
+            if (cap && String(cap.status).toLowerCase() === 'paid') {
+              alert('Payment successful');
+              clearCart();
+              setIsCartOpen(false);
+            } else {
+              alert('Capture failed');
+            }
+          } catch (e) {
+            console.error(e);
+            alert('Capture failed');
+          }
+        }
+      });
+
+      rzp.on('payment.failed', (err) => {
+        console.error(err);
+        alert('Payment failed: ' + err.error.description);
+      });
+
+      rzp.open();
+
+    } catch (e) {
+      console.error(e);
+      alert('Payment flow failed: ' + e.message);
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  // ----------------------------
+  // RENDER
+  // ----------------------------
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* Header */}
-      <header className="bg-blue-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-white rounded px-3 py-1 text-blue-600 font-bold">LOGO</div>
-              <div className="hidden sm:block text-sm">Deliver to Hyderabad</div>
-            </div>
+    <div className="min-h-screen bg-gray-50">
 
-            <div className="flex-1">
-              <form className="flex" onSubmit={(e)=>e.preventDefault()}>
-                <input
-                  value={q}
-                  onChange={(e)=>setQ(e.target.value)}
-                  type="text"
-                  placeholder="Search for products, brands and more"
-                  className="w-full rounded-l-md px-4 py-2 text-gray-700 focus:outline-none"
-                />
-                <button type="button" onClick={()=>setQ(q)} className="bg-yellow-400 text-black px-4 rounded-r-md font-semibold">Search</button>
-              </form>
-            </div>
+      {/* HEADER */}
+      <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
+        <div className="max-w-7xl mx-auto px-4 flex items-center gap-4 py-3">
 
-            <nav className="hidden md:flex items-center gap-6">
-              {authUser ? (
-                <span className="text-sm">Hi, {authUser.username}</span>
-              ) : (
-                <button className="text-sm" onClick={()=>setShowLogin(true)}>Login</button>
-              )}
-              <button className="text-sm">Become a Seller</button>
-              <button className="text-sm">More</button>
-              <button className="text-sm bg-white text-blue-600 px-3 py-1 rounded">Cart ({cartCount})</button>
-            </nav>
+          {/* Logo */}
+          <div className="bg-white text-blue-600 font-bold px-3 py-1 rounded">
+            SMARTSALE
           </div>
+
+          {/* Search */}
+          <div className="flex-1">
+            <div className="flex">
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full rounded-l px-3 py-1 text-black"
+              />
+              <button className="bg-yellow-400 text-black px-4 rounded-r">Search</button>
+            </div>
+          </div>
+
+          {/* Login / Logout */}
+          {!isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <input ref={usernameRef} placeholder="Username" className="text-black px-2 py-1 rounded" />
+              <input ref={passwordRef} type="password" placeholder="Password" className="text-black px-2 py-1 rounded" />
+              <button onClick={login} className="bg-white text-blue-600 px-3 py-1 rounded">Login</button>
+              <button onClick={() => setShowSignup(true)} className="bg-green-500 text-white px-3 py-1 rounded">Sign Up</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span>Hello, <b>{usernameDisplay}</b></span>
+              <button onClick={logout} className="bg-white text-red-600 px-3 py-1 rounded">Logout</button>
+            </div>
+          )}
+
+          {/* Cart */}
+          <button
+            className="bg-white text-blue-600 px-4 py-1 rounded"
+            onClick={() => setIsCartOpen(true)}
+          >
+            Cart ({totalItems})
+          </button>
+
         </div>
       </header>
 
-      {/* Body */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Filters sidebar (static demo) */}
-        <aside className="hidden lg:block lg:col-span-1">
-          <div className="sticky top-20 space-y-4">
-            <div className="bg-white p-4 rounded shadow-sm">
-              <h3 className="font-semibold mb-2">Filters</h3>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <label className="block text-xs font-medium">Price</label>
-                  <div className="flex gap-2 mt-2">
-                    <input placeholder="Min" className="w-1/2 border px-2 py-1 rounded" />
-                    <input placeholder="Max" className="w-1/2 border px-2 py-1 rounded" />
-                  </div>
-                </div>
-              </div>
+      {/* MAIN GRID */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+
+        {/* Categories */}
+        <div className="flex gap-3 overflow-x-auto pb-4">
+          {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks'].map(c => (
+            <span key={c} className="px-3 py-1 bg-white rounded shadow">{c}</span>
+          ))}
+        </div>
+
+        {/* Product Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filtered.map(p => (
+            <div key={p.id} className="bg-white p-3 rounded shadow hover:shadow-lg">
+              {/* Image */}
+              <img src={p.image} alt={p.name} className="w-full h-40 object-contain mb-2 rounded" />
+
+              <ProductCard p={p} onAdd={addToCart} />
             </div>
-          </div>
-        </aside>
-
-        {/* Products area */}
-        <section className="lg:col-span-3 space-y-6">
-          {/* status */}
-          {loading && <div className="bg-white p-4 rounded shadow-sm">Loading products…</div>}
-          {error && <div className="bg-red-50 text-red-700 p-4 rounded shadow-sm">{String(error)}</div>}
-
-          {/* grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filtered.map((p) => (
-              <article key={p.id} className="bg-white p-3 rounded shadow-sm hover:shadow-md transition">
-                <div className="relative">
-                  <img src={pickImage(p)} alt={p.name} className="w-full h-40 object-contain" />
-                </div>
-                <h3 className="mt-2 text-sm font-medium line-clamp-2">{p.name}</h3>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <div>
-                    <div className="font-bold">₹{fmtINR(p.price)}</div>
-                    {p.originalPrice ? (
-                      <div className="text-xs line-through text-gray-400">₹{fmtINR(p.originalPrice)}</div>
-                    ) : null}
-                  </div>
-                  <div className="text-xs bg-green-600 text-white px-2 py-1 rounded">{p.rating}★</div>
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button className="flex-1 border rounded py-1 text-sm" onClick={()=>addToCart(p)}>Add to Cart</button>
-                  <button className="w-10 border rounded py-1 text-sm" title="Wishlist">❤️</button>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          {/* Cart summary & checkout */}
-          <div className="bg-white p-4 rounded shadow-sm flex items-center justify-between">
-            <div className="text-sm">Items: <b>{cartCount}</b> • Total: <b>₹{fmtINR(cartTotal)}</b></div>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={checkout} disabled={!cart.length}>Checkout</button>
-          </div>
-        </section>
+          ))}
+        </div>
       </main>
 
-      {/* Login modal */}
-      {showLogin && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <form onSubmit={doLogin} className="bg-white w-full max-w-sm rounded-xl p-6 space-y-3">
-            <h3 className="text-lg font-semibold">Login</h3>
-            <input value={username} onChange={(e)=>setUsername(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Username" />
-            <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Password" />
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="px-3 py-2" onClick={()=>setShowLogin(false)}>Cancel</button>
-              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Login</button>
+      {/* CART DRAWER */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-black/50 flex justify-end z-50" onClick={() => setIsCartOpen(false)}>
+          <div className="bg-white w-80 h-full p-4 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">Your Cart</h2>
+
+            <Cart cart={cart} onInc={inc} onDec={dec} />
+
+            {/* Totals */}
+            <div className="mt-4 border-t pt-4">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <b>₹ {totals.sub.toFixed(2)}</b>
+              </div>
+              <div className="flex justify-between">
+                <span>GST:</span>
+                <b>₹ {totals.tax.toFixed(2)}</b>
+              </div>
+              <div className="flex justify-between text-lg font-bold mt-2">
+                <span>Total:</span>
+                <span>₹ {totals.grand.toFixed(2)}</span>
+              </div>
+
+              <button
+                disabled={totalItems === 0 || paying}
+                onClick={pay}
+                className="w-full mt-4 bg-blue-600 text-white py-2 rounded"
+              >
+                {paying ? 'Processing…' : 'Checkout'}
+              </button>
+
+              <button
+                className="w-full mt-2 bg-red-500 text-white py-1 rounded"
+                onClick={clearCart}
+              >
+                Clear Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SIGNUP MODAL */}
+      {showSignup && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <form
+            onSubmit={signupSubmit}
+            className="bg-white p-6 rounded shadow max-w-xl w-full"
+          >
+            <h2 className="text-xl font-bold mb-4">Create Account</h2>
+
+            <div className="grid grid-cols-2 gap-3 text-black">
+              {Object.keys(signupData).map(k => (
+                <input
+                  key={k}
+                  placeholder={k}
+                  value={signupData[k]}
+                  onChange={(e) => signupFieldChange(k, e.target.value)}
+                  className="border p-2 rounded"
+                />
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button type="button" onClick={() => setShowSignup(false)}>Cancel</button>
+              <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded">
+                {signupLoading ? '...' : 'Sign Up'}
+              </button>
             </div>
           </form>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="bg-white border-t mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-gray-500">
-          © {new Date().getFullYear()} SmartSale — Built with ❤️
-        </div>
-      </footer>
     </div>
   );
 }
