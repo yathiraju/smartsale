@@ -271,6 +271,15 @@ export default function FlipkartLikeApp() {
     });
   }
 
+  function removeFromCart(id) {
+    setCart(prev => {
+      const c = { ...prev };
+      delete c[id];
+      return c;
+    });
+  }
+
+
   async function pay() {
     if (paying) return;
     setPaying(true);
@@ -416,46 +425,15 @@ export default function FlipkartLikeApp() {
       </main>
 
       {/* CART DRAWER */}
-      {isCartOpen && (
-        <div className="fixed inset-0 bg-black/50 flex justify-end z-50" onClick={() => setIsCartOpen(false)}>
-          <div className="bg-white w-80 h-full p-4 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">Your Cart</h2>
-
-            <Cart cart={cart} onInc={inc} onDec={dec} />
-
-            {/* Totals */}
-            <div className="mt-4 border-t pt-4">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <b>₹ {totals.sub.toFixed(2)}</b>
-              </div>
-              <div className="flex justify-between">
-                <span>GST:</span>
-                <b>₹ {totals.tax.toFixed(2)}</b>
-              </div>
-              <div className="flex justify-between text-lg font-bold mt-2">
-                <span>Total:</span>
-                <span>₹ {totals.grand.toFixed(2)}</span>
-              </div>
-
-              <button
-                disabled={totalItems === 0 || paying}
-                onClick={pay}
-                className="w-full mt-4 bg-blue-600 text-white py-2 rounded"
-              >
-                {paying ? 'Processing…' : 'Checkout'}
-              </button>
-
-              <button
-                className="w-full mt-2 bg-red-500 text-white py-1 rounded"
-                onClick={clearCart}
-              >
-                Clear Cart
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Cart
+        cart={cart}
+        onInc={inc}
+        onDec={dec}
+        onRemove={removeFromCart}
+        onPay={pay}
+        open={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+      />
 
       {/* SIGNUP MODAL */}
       {showSignup && (
