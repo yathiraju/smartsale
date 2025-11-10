@@ -12,14 +12,13 @@ export default function Cart({
   onInc,              // (id) => void
   onDec,              // (id) => void
   onRemove,           // (id) => void
+  onPay,              // () => void
+  onClear,            // () => void
   open,               // boolean -> render as overlay drawer when true
   onClose,            // () => void
 }) {
   const items = Object.values(cart);
 
-  // compute totals
-  let subTotal = 0;
-  let gstTotal = 0;
 
   const rows = items.map((ci) => {
     const p = ci.product || {};
@@ -30,8 +29,6 @@ export default function Cart({
     const lineSubtotal = unitPrice * qty;
     const lineGST = (unitPrice * taxRate / 100) * qty;
 
-    subTotal += lineSubtotal;
-    gstTotal += lineGST;
 
     return {
       id: p.id,
@@ -43,7 +40,6 @@ export default function Cart({
     };
   });
 
-  const grandTotal = subTotal + gstTotal;
 
   // Close on ESC when drawer is open
   useEffect(() => {
@@ -100,12 +96,19 @@ export default function Cart({
           background: '#fff',
           borderRadius: 8,
           border: '1px solid #e5e7eb',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: 'min(80vh, 720px)', // keep footer visible in inline mode too
         }}
       >
         {children}
       </aside>
     );
   };
+
+  // Heights to keep the footer in view:
+  // header ~64px, footer ~150px -> body maxHeight leaves safe buffer
+  const bodyMaxHeight = 'calc(100vh - 214px)';
 
   return (
     <Wrapper>
@@ -117,6 +120,7 @@ export default function Cart({
           justifyContent: 'space-between',
           padding: '16px',
           borderBottom: '1px solid #f1f5f9',
+          flexShrink: 0,
         }}
       >
         <div style={{ fontWeight: 700 }}>Your Cart</div>
@@ -143,18 +147,17 @@ export default function Cart({
         )}
       </div>
 
-      {/* Scrollable body */}
+      {/* Scrollable body (only this section scrolls) */}
       <div
         style={{
           padding: 16,
           overflowY: 'auto',
           flex: 1,
-          // ensure scroll area even with large content; header ~64px, footer ~110px
-          maxHeight: 'calc(100vh - 180px)',
+          maxHeight: bodyMaxHeight, // ensures long lists scroll and footer stays visible
         }}
       >
         {rows.length === 0 ? (
-          <div className="muted">Cart is empty</div>
+          <div className="muted" style={{ color: '#6b7280' }}>Cart is empty</div>
         ) : (
           rows.map((r) => (
             <div
@@ -232,17 +235,19 @@ export default function Cart({
         )}
       </div>
 
-      {/* Totals (no Pay button) */}
-      <div style={{ borderTop: '1px solid #f1f5f9', padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div style={{ color: '#6b7280' }}>GST Total</div>
-          <div>₹{fmtINR(Math.round(gstTotal))}</div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-          <div>Grand Total</div>
-          <div>₹{fmtINR(Math.round(grandTotal))}</div>
-        </div>
+      {/* Sticky footer (SECOND SECTION) with totals + Checkout & Clear Cart */}
+      <div
+        style={{
+          borderTop: '1px solid #f1f5f9',
+          padding: 16,
+          background: '#fff',
+          boxShadow: '0 -6px 12px rgba(0,0,0,0.04)',
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 1,
+          flexShrink: 0,
+        }}
+      >
       </div>
     </Wrapper>
   );
