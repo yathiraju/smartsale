@@ -1,10 +1,13 @@
 // src/components/Cart.jsx
 import React, { useEffect } from 'react';
 
-function fmtINR(v) {
-  const n = Number(v || 0);
+function fmtINR(v, digits = 2) {
+  const n = Number(v ?? 0);
   if (!isFinite(n)) return '—';
-  return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  return n.toLocaleString('en-IN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 export default function Cart({
@@ -57,32 +60,49 @@ export default function Cart({
       );
     }
     return (
-      <aside style={{
-        background: '#fff',
-        borderRadius: 8,
-        border: '1px solid #e5e7eb',
-        display: 'flex',
-        flexDirection: 'column',
-        maxHeight: '100vh',
-      }}>
+      <aside
+        style={{
+          background: '#fff',
+          borderRadius: 8,
+          border: '1px solid #e5e7eb',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '100vh',
+        }}
+      >
         {children}
       </aside>
     );
   };
 
-  const subtotal = items.reduce((s, ci) => s + (ci.product?.price || 0) * ci.qty, 0);
-  const gst = Math.round(subtotal * 0.154); // adjust if you have your own tax rule
-  const grand = subtotal + gst;
+  // ✅ Totals with per-item taxRate (your logic)
+  function computeTotals() {
+    let sub = 0;
+    let gst = 0;
+    Object.values(cart).forEach((ci) => {
+      const price = Number(ci?.product?.salePrice ?? ci?.product?.price ?? 0);
+      const taxRate = Number(ci?.product?.taxRate ?? 0);
+      sub += price * ci.qty;
+      gst += (price * taxRate) / 100 * ci.qty;
+    });
+    const tax = Math.round(gst * 100) / 100;
+    const grand = Math.round((sub + tax) * 100) / 100;
+    return { sub, tax, grand };
+  }
+
+  const { sub: subtotal, tax: gst, grand } = computeTotals();
 
   return (
     <Wrapper>
       {/* Header */}
-      <div style={{
-        padding: 16,
-        borderBottom: '1px solid #f1f5f9',
-        fontWeight: 700,
-        flexShrink: 0,
-      }}>
+      <div
+        style={{
+          padding: 16,
+          borderBottom: '1px solid #f1f5f9',
+          fontWeight: 700,
+          flexShrink: 0,
+        }}
+      >
         Your Cart
       </div>
 
@@ -90,59 +110,73 @@ export default function Cart({
       <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
         {items.length === 0 ? (
           <div style={{ color: '#6b7280' }}>Cart is empty</div>
-        ) : items.map((ci) => {
-          const p = ci.product;
-          const id = p?.id;
-          return (
-            <div key={id} style={{ padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{p?.name}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    ₹{fmtINR(p?.price)} × {ci.qty}
+        ) : (
+          items.map((ci) => {
+            const p = ci.product || {};
+            const id = p.id;
+            const unitPrice = Number(p.salePrice ?? p.price ?? 0);
+            const lineTotal = unitPrice * ci.qty;
+
+            return (
+              <div
+                key={id}
+                style={{ padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      ₹{fmtINR(unitPrice)} × {ci.qty}
+                      {p.taxRate != null && (
+                        <span> • GST {Number(p.taxRate)}%</span>
+                      )}
+                    </div>
                   </div>
+                  <div style={{ fontWeight: 600 }}>₹{fmtINR(lineTotal)}</div>
                 </div>
-                <div style={{ fontWeight: 600 }}>
-                  ₹{fmtINR((p?.price || 0) * ci.qty)}
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                  <button type="button" onClick={() => onDec?.(id)} style={{ width: 28 }}>
+                    –
+                  </button>
+                  <div style={{ width: 24, textAlign: 'center' }}>{ci.qty}</div>
+                  <button type="button" onClick={() => onInc?.(id)} style={{ width: 28 }}>
+                    +
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRemove?.(id)}
+                    style={{
+                      marginLeft: 12,
+                      fontSize: 12,
+                      color: '#ef4444',
+                      textDecoration: 'underline',
+                      background: 'transparent',
+                      border: 0,
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                    aria-label={`Remove ${p.name}`}
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
-                <button type="button" onClick={() => onDec?.(id)} style={{ width: 28 }}>–</button>
-                <div style={{ width: 24, textAlign: 'center' }}>{ci.qty}</div>
-                <button type="button" onClick={() => onInc?.(id)} style={{ width: 28 }}>+</button>
-
-                {/* Keep comments OUTSIDE attributes; explicit type avoids form submit */}
-                <button
-                  type="button"
-                  onClick={() => onRemove?.(id)}
-                  style={{
-                    marginLeft: 12,
-                    fontSize: 12,
-                    color: '#ef4444',
-                    textDecoration: 'underline',
-                    background: 'transparent',
-                    border: 0,
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                  aria-label={`Remove ${p?.name}`}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Footer (always visible) */}
-      <div style={{
-        padding: 16,
-        borderTop: '1px solid #f1f5f9',
-        boxShadow: '0 -6px 12px rgba(0,0,0,0.04)',
-        flexShrink: 0,
-      }}>
+      <div
+        style={{
+          padding: 16,
+          borderTop: '1px solid #f1f5f9',
+          boxShadow: '0 -6px 12px rgba(0,0,0,0.04)',
+          flexShrink: 0,
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <span style={{ color: '#374151' }}>Subtotal:</span>
           <strong>₹{fmtINR(subtotal)}</strong>
