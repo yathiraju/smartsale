@@ -357,8 +357,15 @@ export default function FlipkartLikeApp() {
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-4 py-3">
 
           {/* Logo */}
-          <div className="bg-white text-blue-600 font-bold px-3 py-1 rounded">
-            SMARTSALE
+          <div className="flex items-center">
+            <img
+              src="/smartsale.png"
+              alt="SmartSale"
+              className="w-8 h-8 object-contain mr-2"   // small icon size; adjust as needed
+              onError={(e) => { e.currentTarget.style.display = 'none'; }} // hide if missing
+              aria-hidden={false}
+            />
+       {/*      <span className="text-white font-bold hidden sm:inline">SMARTSALE</span> */}
           </div>
 
           {/* Search */}
