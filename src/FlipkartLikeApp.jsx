@@ -47,6 +47,22 @@ export default function FlipkartLikeApp() {
     applySearch(search);
   }, [search, products]);
 
+     // ----------------------------
+      // image URL
+      // ----------------------------
+
+    function imageUrlForSku(sku, ext = 'png') {
+      if (!sku) return '/placeholder.png';
+      const repoUser = 'yathiraju';
+      const repo = 'smartsale-images';
+      // Option A: use default branch (fast)
+      // return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}/products/${encodeURIComponent(sku)}.${ext}`;
+
+      // Option B: pin to a tag/commit to avoid caching surprises (recommended)
+      const version = 'main'; // or 'v1.0.0' or commit-sha
+      return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
+    }
+
   // ----------------------------
   // FETCH PRODUCTS
   // ----------------------------
@@ -58,7 +74,7 @@ export default function FlipkartLikeApp() {
       // add placeholder image based on SKU
       const mapped = list.map(p => ({
         ...p,
-        image: `https://via.placeholder.com/300x300?text=${encodeURIComponent(p.sku || p.name || 'Product')}`
+        image: p.sku ? imageUrlForSku(p.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(p.name||'Product')}`
       }));
 
       setProducts(mapped);
@@ -346,6 +362,7 @@ export default function FlipkartLikeApp() {
     }
   }
 
+
   // ----------------------------
   // RENDER
   // ----------------------------
@@ -361,7 +378,7 @@ export default function FlipkartLikeApp() {
             <img
               src="/smartsale.png"
               alt="SmartSale"
-              className="w-8 h-8 object-contain mr-2"   // small icon size; adjust as needed
+              className="w-16 h-16 object-contain mr-2"   // small icon size; adjust as needed
               onError={(e) => { e.currentTarget.style.display = 'none'; }} // hide if missing
               aria-hidden={false}
             />
