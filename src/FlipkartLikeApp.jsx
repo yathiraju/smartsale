@@ -37,36 +37,25 @@ export default function FlipkartLikeApp() {
   });
 
   // ----------------------------
-  // EFFECTS
+  // image URL
   // ----------------------------
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  function imageUrlForSku(sku, ext = 'png') {
+    if (!sku) return '/placeholder.png';
+    const repoUser = 'yathiraju';
+    const repo = 'smartsale-images';
+    // Option A: use default branch (fast)
+    // return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}/products/${encodeURIComponent(sku)}.${ext}`;
 
-  useEffect(() => {
-    applySearch(search);
-  }, [search, products]);
-
-     // ----------------------------
-      // image URL
-      // ----------------------------
-
-    function imageUrlForSku(sku, ext = 'png') {
-      if (!sku) return '/placeholder.png';
-      const repoUser = 'yathiraju';
-      const repo = 'smartsale-images';
-      // Option A: use default branch (fast)
-      // return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}/products/${encodeURIComponent(sku)}.${ext}`;
-
-      // Option B: pin to a tag/commit to avoid caching surprises (recommended)
-      const version = 'main'; // or 'v1.0.0' or commit-sha
-      return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
-    }
+    // Option B: pin to a tag/commit to avoid caching surprises (recommended)
+    const version = 'main'; // or 'v1.0.0' or commit-sha
+    return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
+  }
 
   // ----------------------------
   // FETCH PRODUCTS
+  // useCallback so it can be used safely in useEffect deps
   // ----------------------------
-  async function fetchProducts() {
+  const fetchProducts = useCallback(async () => {
     try {
       const res = await api.products();
       const list = Array.isArray(res) ? res : [];
@@ -74,7 +63,7 @@ export default function FlipkartLikeApp() {
       // add placeholder image based on SKU
       const mapped = list.map(p => ({
         ...p,
-        image: p.sku ? imageUrlForSku(p.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(p.name||'Product')}`
+        image: p.sku ? imageUrlForSku(p.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(p.name || 'Product')}`
       }));
 
       setProducts(mapped);
@@ -83,22 +72,35 @@ export default function FlipkartLikeApp() {
       console.error(e);
       alert('Cannot load products');
     }
-  }
+  }, []); // stable, no external deps
 
   // ----------------------------
   // SEARCH
+  // applySearch is stable via useCallback and depends on products & search
   // ----------------------------
-  function applySearch(q) {
-    const s = String(q).trim().toLowerCase();
+  const applySearch = useCallback((q = null) => {
+    const query = q !== null ? String(q) : String(search);
+    const s = String(query).trim().toLowerCase();
     if (!s) {
       setFiltered(products);
       return;
     }
     setFiltered(products.filter(p =>
-      p.name.toLowerCase().includes(s) ||
-      (p.sku && p.sku.toLowerCase().includes(s))
+      (String(p.name || '').toLowerCase().includes(s)) ||
+      (p.sku && String(p.sku || '').toLowerCase().includes(s))
     ));
-  }
+  }, [products, search]);
+
+  // ----------------------------
+  // EFFECTS
+  // ----------------------------
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    applySearch();
+  }, [applySearch]);
 
   // ----------------------------
   // LOGIN
@@ -254,7 +256,6 @@ export default function FlipkartLikeApp() {
   // ----------------------------
   // SAVE CART → CHECKOUT → RZP ORDER → PAYMENT
   // ----------------------------
-
   async function saveCart() {
     try {
       const items = Object.values(cart).map(ci => ({
@@ -294,7 +295,6 @@ export default function FlipkartLikeApp() {
       return c;
     });
   }
-
 
   async function pay() {
     if (paying) return;
@@ -382,7 +382,7 @@ export default function FlipkartLikeApp() {
               onError={(e) => { e.currentTarget.style.display = 'none'; }} // hide if missing
               aria-hidden={false}
             />
-       {/*      <span className="text-white font-bold hidden sm:inline">SMARTSALE</span> */}
+         {/*    <span className="text-white font-bold hidden sm:inline">SMARTSALE</span> */}
           </div>
 
           {/* Search */}
@@ -395,7 +395,7 @@ export default function FlipkartLikeApp() {
                 onChange={e => setSearch(e.target.value)}
                 className="w-full rounded-l px-3 py-1 text-black"
               />
-              <button className="bg-yellow-400 text-black px-4 rounded-r">Search</button>
+              <button className="bg-yellow-400 text-black px-4 rounded-r" onClick={() => applySearch(search)}>Search</button>
             </div>
           </div>
 
