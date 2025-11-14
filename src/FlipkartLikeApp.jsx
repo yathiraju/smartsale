@@ -438,11 +438,30 @@ export default function FlipkartLikeApp() {
         {/* Product Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {filtered.map(p => (
-            <div key={p.id} className="bg-white p-3 rounded shadow hover:shadow-lg">
-              {/* Image */}
-              <img src={p.image} alt={p.name} className="w-full h-40 object-contain mb-2 rounded" />
+            <div
+              key={p.id ?? p._id ?? p.sku}
+              className="bg-white p-3 rounded shadow hover:shadow-lg flex flex-col h-full"
+            >
+              {/* IMAGE: fixed height area so all cards align */}
+              <div className="flex-none">
+                <img
+                  src={p.image}
+                  alt={p.name}
+                  className="w-full h-40 object-contain mb-2 rounded"
+                />
+              </div>
 
-              <ProductCard p={p} onAdd={addToCart} />
+              {/* CONTENT: fills available height so controls stay at bottom */}
+              <div className="flex-1">
+                <ProductCard
+                  p={p}
+                  cart={cart}
+                  onAdd={addToCart}
+                  onInc={inc}
+                  onDec={dec}
+                  onRemove={removeFromCart}
+                />
+              </div>
             </div>
           ))}
         </div>
