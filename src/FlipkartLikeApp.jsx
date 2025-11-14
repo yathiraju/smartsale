@@ -47,7 +47,7 @@ export default function FlipkartLikeApp() {
     // return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}/products/${encodeURIComponent(sku)}.${ext}`;
 
     // Option B: pin to a tag/commit to avoid caching surprises (recommended)
-    const version = 'main'; // or 'v1.0.0' or commit-sha
+    const version = 'test'; // or 'v1.0.0' or commit-sha
     return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
   }
 
