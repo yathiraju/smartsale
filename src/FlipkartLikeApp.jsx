@@ -419,7 +419,7 @@ export default function FlipkartLikeApp() {
             className="bg-white text-blue-600 px-4 py-1 rounded"
             onClick={() => setIsCartOpen(true)}
           >
-            Cart ({totalItems})
+            Cart 🛒({totalItems})
           </button>
 
         </div>
