@@ -1,5 +1,5 @@
 // src/components/Cart.jsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 function fmtINR(v, digits = 2) {
   const n = Number(v ?? 0);
@@ -20,6 +20,8 @@ export default function Cart({
   onClose,
 }) {
   const items = Object.values(cart);
+  const [isLoading, setIsLoading] = useState(false);
+  const [dots, setDots] = useState('');
 
   // Close on Escape only when used as a drawer
   useEffect(() => {
@@ -28,6 +30,21 @@ export default function Cart({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  // animate dots while loading
+  useEffect(() => {
+    if (!isLoading) {
+      setDots('');
+      return;
+    }
+    let idx = 0;
+    const frames = ['', '.', '..', '...'];
+    const t = setInterval(() => {
+      idx = (idx + 1) % frames.length;
+      setDots(frames[idx]);
+    }, 300);
+    return () => clearInterval(t);
+  }, [isLoading]);
 
   const Wrapper = ({ children }) => {
     if (typeof open === 'boolean') {
@@ -92,6 +109,27 @@ export default function Cart({
 
   const { sub: subtotal, tax: gst, grand } = computeTotals();
 
+  // Handle pay click. If onPay returns a promise, await it.
+  async function handlePay() {
+    if (isLoading) return;
+    setIsLoading(true);
+    try {
+      const ret = onPay?.();
+      // if onPay returns a promise, await it
+      if (ret && typeof ret.then === 'function') {
+        await ret;
+      } else {
+        // if no onPay or it's sync, keep loading briefly for UX then stop
+        await new Promise((res) => setTimeout(res, 600));
+      }
+    } catch (err) {
+      // swallow here — caller can show error via onPay promise rejection
+      // optionally you can console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <Wrapper>
       {/* Header */}
@@ -136,11 +174,23 @@ export default function Cart({
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
-                  <button type="button" onClick={() => onDec?.(id)} style={{ width: 28 }}>
+                  <button
+                    type="button"
+                    onClick={() => onDec?.(id)}
+                    style={{ width: 28 }}
+                    disabled={isLoading}
+                    aria-disabled={isLoading}
+                  >
                     –
                   </button>
                   <div style={{ width: 24, textAlign: 'center' }}>{ci.qty}</div>
-                  <button type="button" onClick={() => onInc?.(id)} style={{ width: 28 }}>
+                  <button
+                    type="button"
+                    onClick={() => onInc?.(id)}
+                    style={{ width: 28 }}
+                    disabled={isLoading}
+                    aria-disabled={isLoading}
+                  >
                     +
                   </button>
 
@@ -158,6 +208,8 @@ export default function Cart({
                       padding: 0,
                     }}
                     aria-label={`Remove ${p.name}`}
+                    disabled={isLoading}
+                    aria-disabled={isLoading}
                   >
                     Remove
                   </button>
@@ -191,19 +243,26 @@ export default function Cart({
         </div>
         <button
           type="button"
-          onClick={onPay}
+          onClick={handlePay}
           style={{
             width: '100%',
             padding: '12px 14px',
             fontWeight: 700,
             borderRadius: 8,
             border: 0,
-            background: '#111827',
+            background: isLoading ? '#374151' : '#111827',
             color: '#fff',
-            cursor: 'pointer',
+            cursor: isLoading ? 'wait' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
           }}
+          disabled={isLoading}
+          aria-busy={isLoading}
+          aria-disabled={isLoading}
         >
-          Checkout
+          {isLoading ? `Processing${dots}` : 'Checkout'}
         </button>
       </div>
     </Wrapper>
