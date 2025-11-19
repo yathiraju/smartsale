@@ -364,6 +364,13 @@ export default function FlipkartLikeApp() {
   }
 
   // ----------------------------
+  // Utilities
+  // ----------------------------
+  function isValidPincode(pin) {
+    return /^[1-9][0-9]{5}$/.test(String(pin || '').trim());
+  }
+
+  // ----------------------------
   // BUY NOW flow
   // ----------------------------
   async function handleBuyNow() {
@@ -392,8 +399,71 @@ export default function FlipkartLikeApp() {
       try { resp = await resRaw.json(); } catch { resp = null; }
 
       if (resRaw.ok && Array.isArray(resp) && resp.length > 0) {
-        setAddrChoices(resp);
+        // ensure addresses have pincode; if not, force manual entry
+        const hasValid = resp.some(a => isValidPincode(a?.pincode));
+        if (!hasValid) {
+          setAddrChoices([]);
+          setManualAddr({ line1: '', pincode: '' });
+          setAddrModalOpen(true);
+        } else {
+          setAddrChoices(resp);
+          setAddrModalOpen(true);
+        }
+      } else {
+        setAddrChoices([]);
+        setManualAddr({ line1: '', pincode: '' });
         setAddrModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Fetch addresses failed', err);
+      alert('Failed to fetch addresses. Please enter address manually.');
+      setAddrChoices([]);
+      setManualAddr({ line1: '', pincode: '' });
+      setAddrModalOpen(true);
+    } finally {
+      setAddrLoading(false);
+    }
+  }
+
+  // New: open address modal when user clicks "Change address"
+  async function openChangeAddressModal() {
+    if (!isLoggedIn) {
+      alert('Please sign in to change address.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // reset shipping state so user will re-check after choosing new address
+    resetShippingState();
+
+    setAddrLoading(true);
+    try {
+      const username = localStorage.getItem('rzp_username') || usernameDisplay;
+      if (!username) {
+        alert('Username not found. Please log in again.');
+        setIsLoggedIn(false);
+        return;
+      }
+
+      const host = api.getApiHost?.() || 'http://localhost:8080';
+      const resRaw = await fetch(`${host}/api/user/address/${encodeURIComponent(username)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      let resp;
+      try { resp = await resRaw.json(); } catch { resp = null; }
+
+      if (resRaw.ok && Array.isArray(resp) && resp.length > 0) {
+        const hasValid = resp.some(a => isValidPincode(a?.pincode));
+        if (!hasValid) {
+          setAddrChoices([]);
+          setManualAddr({ line1: '', pincode: '' });
+          setAddrModalOpen(true);
+        } else {
+          setAddrChoices(resp);
+          setAddrModalOpen(true);
+        }
       } else {
         setAddrChoices([]);
         setManualAddr({ line1: '', pincode: '' });
@@ -412,8 +482,21 @@ export default function FlipkartLikeApp() {
 
   // user selected or entered address
   async function onAddressChosen(addr) {
+    // validate pincode if available
+    const pincode = addr?.pincode || addr?.postalCode || addr?.zip;
+    if (!isValidPincode(pincode)) {
+      alert('Selected address has invalid/missing pincode. Please enter a valid 6-digit pincode.');
+      // open manual entry prefilled if possible
+      setManualAddr({ line1: addr?.line1 || addr?.name || '', pincode: '' });
+      setAddrChoices([]);
+      setAddrModalOpen(true);
+      return;
+    }
+
     setAddrModalOpen(false);
-    setSelectedAddress(addr);
+    // normalize address object to contain `pincode` and `line1`
+    const normalized = { ...addr, pincode: String(pincode).trim(), line1: addr?.line1 || addr?.name || '' };
+    setSelectedAddress(normalized);
 
     const weight = computeCartWeight();
 
@@ -421,7 +504,7 @@ export default function FlipkartLikeApp() {
       const host = api.getApiHost?.() || 'http://localhost:8080';
       const body = {
         pickup_postcode: null,
-        delivery_postcode: addr.pincode || addr.pincode || addr.postalCode || addr.zip || addr.pincode,
+        delivery_postcode: normalized.pincode,
         cod: 0,
         weight: Number(weight || 0)
       };
@@ -460,7 +543,6 @@ export default function FlipkartLikeApp() {
       fee = Number(isNaN(fee) ? 0 : fee);
       setDeliveryFee(fee);
       setShippingChecked(true); // mark shipping check succeeded
-
       setIsCartOpen(true);
 
       if (fee > 0) {
@@ -476,8 +558,10 @@ export default function FlipkartLikeApp() {
 
   function chooseAddrFromList(a) { onAddressChosen(a); }
   function submitManualAddr() {
-    if (!manualAddr.pincode) return alert('Please enter delivery pincode');
-    const addr = { line1: manualAddr.line1 || '', pincode: manualAddr.pincode };
+    const pin = String(manualAddr.pincode || '').trim();
+    if (!pin) return alert('Please enter delivery pincode');
+    if (!isValidPincode(pin)) return alert('Please enter a valid 6-digit pincode (e.g. 500089)');
+    const addr = { line1: manualAddr.line1 || '', pincode: pin };
     onAddressChosen(addr);
   }
 
@@ -514,9 +598,44 @@ export default function FlipkartLikeApp() {
             </div>
           )}
 
-          <button className="bg-white text-blue-600 px-4 py-1 rounded" onClick={() => setIsCartOpen(true)}>
-            Cart 🛒({totalItems})
-          </button>
+          {/* Cart + Shipping badge + Change address */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {shippingChecked && deliveryFee != null && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{
+                  background: '#10b981',
+                  color: '#fff',
+                  padding: '4px 8px',
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 700
+                }}>
+                  Shipping ₹{Number(deliveryFee || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+
+                {/* Change address button */}
+                <button
+                  onClick={openChangeAddressModal}
+                  style={{
+                    background: '#0ea5e9',
+                    color: '#fff',
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
+            <button className="bg-white text-blue-600 px-4 py-1 rounded" onClick={() => setIsCartOpen(true)}>
+              Cart 🛒({totalItems})
+            </button>
+          </div>
         </div>
       </header>
 
@@ -602,7 +721,7 @@ export default function FlipkartLikeApp() {
                 <div className="text-sm text-gray-600 mb-2">No saved addresses. Enter delivery address (pincode required).</div>
                 <div className="grid grid-cols-1 gap-2">
                   <input placeholder="Address line 1" value={manualAddr.line1} onChange={e => setManualAddr(prev => ({ ...prev, line1: e.target.value }))} className="border p-2 rounded" />
-                  <input placeholder="Pincode" value={manualAddr.pincode} onChange={e => setManualAddr(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="Pincode (6 digits)" value={manualAddr.pincode} onChange={e => setManualAddr(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
                 </div>
                 <div className="flex justify-end gap-2 mt-3">
                   <button onClick={() => setAddrModalOpen(false)} className="px-3 py-1">Cancel</button>
