@@ -1,4 +1,3 @@
-// src/components/Cart.jsx
 import React, { useEffect, useState } from 'react';
 
 function fmtINR(v, digits = 2) {
@@ -16,11 +15,12 @@ export default function Cart({
   onDec,
   onRemove,
   onPay,
-  onBuyNow,           // NEW: buy now handler passed from parent
+  onBuyNow,
   open,
   onClose,
-  deliveryFee = 0,    // NEW: delivery fee (number)
-  selectedAddress     // optional: show in UI
+  deliveryFee = 0,
+  selectedAddress,
+  shippingChecked = false
 }) {
   const items = Object.values(cart);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,14 +77,13 @@ export default function Cart({
       gst += (price * taxRate) / 100 * ci.qty;
     });
     const tax = Math.round(gst * 100) / 100;
-    // NOTE: deliveryFee is NOT included in GST here (delivery shown separately)
+    // deliveryFee included in grand total but shown separately
     const grand = Math.round((sub + tax + (Number(deliveryFee || 0))) * 100) / 100;
     return { sub, tax, grand };
   }
 
   const { sub: subtotal, tax: gst, grand } = computeTotals();
 
-  // Handle pay click. If onPay returns a promise, await it.
   async function handlePay() {
     if (isLoading) return;
     setIsLoading(true);
@@ -96,7 +95,7 @@ export default function Cart({
         await new Promise((res) => setTimeout(res, 600));
       }
     } catch (err) {
-      // swallow — caller handles
+      // caller handles
     } finally {
       setIsLoading(false);
     }
@@ -104,7 +103,6 @@ export default function Cart({
 
   async function handleBuyNowClick() {
     if (isLoading) return;
-    // delegate to parent which will fetch addresses, shipping, etc.
     try {
       const ret = onBuyNow?.();
       if (ret && typeof ret.then === 'function') await ret;
@@ -175,7 +173,6 @@ export default function Cart({
           <strong>₹{fmtINR(gst)}</strong>
         </div>
 
-        {/* Delivery fee shown as separate line */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <span style={{ color: '#374151' }}>Delivery:</span>
           <strong>₹{fmtINR(Number(deliveryFee || 0))}</strong>
@@ -190,16 +187,22 @@ export default function Cart({
           {/* BUY NOW button (left) */}
           <button type="button" onClick={handleBuyNowClick} style={{
             flex: 1, padding: '12px 14px', fontWeight: 700, borderRadius: 8, border: 0,
-            background: '#06b6d4', color: '#fff', cursor: isLoading ? 'wait' : 'pointer'
-          }} disabled={isLoading} aria-busy={isLoading}>
+            background: shippingChecked ? '#94a3b8' : '#06b6d4',
+            color: '#fff',
+            cursor: (isLoading || shippingChecked) ? 'not-allowed' : 'pointer',
+            opacity: (isLoading || shippingChecked) ? 0.7 : 1
+          }} disabled={isLoading || shippingChecked} aria-busy={isLoading}>
             {isLoading ? `Processing${dots}` : 'Buy now'}
           </button>
 
           {/* CHECKOUT button (right) */}
           <button type="button" onClick={handlePay} style={{
             flex: 1, padding: '12px 14px', fontWeight: 700, borderRadius: 8, border: 0,
-            background: isLoading ? '#374151' : '#111827', color: '#fff', cursor: isLoading ? 'wait' : 'pointer'
-          }} disabled={isLoading} aria-busy={isLoading}>
+            background: (isLoading || !shippingChecked) ? '#374151' : '#111827',
+            color: '#fff',
+            cursor: (isLoading || !shippingChecked) ? 'not-allowed' : 'pointer',
+            opacity: (isLoading || !shippingChecked) ? 0.7 : 1
+          }} disabled={isLoading || !shippingChecked} aria-busy={isLoading}>
             {isLoading ? `Processing${dots}` : 'Checkout'}
           </button>
         </div>

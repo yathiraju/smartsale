@@ -1,4 +1,3 @@
-// src/App.jsx  (or wherever your FlipkartLikeApp lives)
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api, getToken, setToken, setUser, getSession } from './services/api';
 import ProductCard from './components/ProductCard';
@@ -6,7 +5,9 @@ import Cart from './components/Cart';
 import './App.css';
 
 export default function FlipkartLikeApp() {
+  // ----------------------------
   // STATES
+  // ----------------------------
   const [products, setProducts] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
@@ -30,18 +31,19 @@ export default function FlipkartLikeApp() {
     pincode: '', country: 'IN', lat: '', lng: ''
   });
 
-  // NEW: selectedAddress & deliveryFee (kept in parent for reuse)
+  // NEW: address & shipping state
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [shippingChecked, setShippingChecked] = useState(false);
 
-  // UI state for address modals
+  // address modal UI
   const [addrModalOpen, setAddrModalOpen] = useState(false);
-  const [addrChoices, setAddrChoices] = useState([]); // multiple addresses returned from API
+  const [addrChoices, setAddrChoices] = useState([]);
   const [manualAddr, setManualAddr] = useState({ line1: '', pincode: '' });
   const [addrLoading, setAddrLoading] = useState(false);
 
   // ----------------------------
-  // image URL helper (unchanged)
+  // image URL
   // ----------------------------
   function imageUrlForSku(sku, ext = 'png') {
     if (!sku) return '/placeholder.png';
@@ -90,7 +92,7 @@ export default function FlipkartLikeApp() {
   useEffect(() => { applySearch(); }, [applySearch]);
 
   // ----------------------------
-  // LOGIN / LOGOUT (unchanged)
+  // LOGIN / LOGOUT
   // ----------------------------
   async function login() {
     const userName = String(usernameRef.current?.value || '').trim();
@@ -119,10 +121,14 @@ export default function FlipkartLikeApp() {
     setIsLoggedIn(false);
     setUsernameDisplay('');
     try { localStorage.removeItem('rzp_username'); } catch (_) {}
+    // clear any stored address/shipping
+    setSelectedAddress(null);
+    setDeliveryFee(0);
+    setShippingChecked(false);
   }
 
   // ----------------------------
-  // SIGNUP (unchanged)
+  // SIGNUP
   // ----------------------------
   async function signupSubmit(e) {
     e.preventDefault();
@@ -158,8 +164,7 @@ export default function FlipkartLikeApp() {
       });
 
       let res;
-      try { res = await resRaw.json(); }
-      catch { res = await resRaw.text(); }
+      try { res = await resRaw.json(); } catch { res = await resRaw.text(); }
 
       if (resRaw.ok) {
         alert('Signup successful. You can now log in.');
@@ -178,8 +183,14 @@ export default function FlipkartLikeApp() {
   function signupFieldChange(k, v) { setSignupData(prev => ({ ...prev, [k]: v })); }
 
   // ----------------------------
-  // CART LOGIC (unchanged)
+  // CART LOGIC (mutations reset shipping state)
   // ----------------------------
+  function resetShippingState() {
+    setShippingChecked(false);
+    setDeliveryFee(0);
+    setSelectedAddress(null);
+  }
+
   function addToCart(product) {
     setCart(prev => {
       const copy = { ...prev };
@@ -188,11 +199,44 @@ export default function FlipkartLikeApp() {
       else copy[product.id] = { product, qty: 1 };
       return copy;
     });
+    resetShippingState();
   }
-  function inc(id) { setCart(prev => { const c = { ...prev }; if (c[id]) c[id] = { ...c[id], qty: c[id].qty + 1 }; return c; }); }
-  function dec(id) { setCart(prev => { const c = { ...prev }; if (c[id]) { const newQty = c[id].qty - 1; if (newQty > 0) c[id] = { ...c[id], qty: newQty }; else delete c[id]; } return c; }); }
-  function clearCart() { setCart({}); }
-  function removeFromCart(id) { setCart(prev => { const c = { ...prev }; delete c[id]; return c; }); }
+
+  function inc(id) {
+    setCart(prev => {
+      const c = { ...prev };
+      if (c[id]) c[id] = { ...c[id], qty: c[id].qty + 1 };
+      return c;
+    });
+    resetShippingState();
+  }
+
+  function dec(id) {
+    setCart(prev => {
+      const c = { ...prev };
+      if (c[id]) {
+        const newQty = c[id].qty - 1;
+        if (newQty > 0) c[id] = { ...c[id], qty: newQty };
+        else delete c[id];
+      }
+      return c;
+    });
+    resetShippingState();
+  }
+
+  function removeFromCart(id) {
+    setCart(prev => {
+      const c = { ...prev };
+      delete c[id];
+      return c;
+    });
+    resetShippingState();
+  }
+
+  function clearCart() {
+    setCart({});
+    resetShippingState();
+  }
 
   const totalItems = Object.values(cart).reduce((x, i) => x + i.qty, 0);
 
@@ -200,17 +244,16 @@ export default function FlipkartLikeApp() {
   // COMPUTE WEIGHT (for shipping)
   // ----------------------------
   function computeCartWeight() {
-    // Use product.weight if available (in kg). fallback 0.5 kg per item.
     let sum = 0;
     Object.values(cart).forEach(ci => {
-      const w = Number(ci?.product?.weight ?? 0.5); // assume 0.5 kg if missing
+      const w = Number(ci?.product?.weight ?? 0.5); // default 0.5 kg per item
       sum += w * ci.qty;
     });
     return sum;
   }
 
   // ----------------------------
-  // SAVE CART & PAYMENT (unchanged, but pay reads deliveryFee from parent)
+  // SAVE CART & PAYMENT
   // ----------------------------
   async function saveCart() {
     try {
@@ -233,6 +276,17 @@ export default function FlipkartLikeApp() {
     }
   }
 
+  function loadRazorpayScript() {
+    return new Promise((resolve, reject) => {
+      if (window.Razorpay) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Razorpay failed'));
+      document.body.appendChild(s);
+    });
+  }
+
   async function pay() {
     if (paying) return;
     setPaying(true);
@@ -242,8 +296,6 @@ export default function FlipkartLikeApp() {
       if (!saved?.id) throw new Error('Cart not saved');
 
       const cartId = saved.id;
-      // compute totals on server; client uses totals with deliveryFee included
-      // compute totals here (same logic as Cart component)
       const sub = Object.values(cart).reduce((s, ci) => {
         const price = Number(ci.product.salePrice ?? ci.product.price ?? 0);
         return s + price * ci.qty;
@@ -269,7 +321,6 @@ export default function FlipkartLikeApp() {
         receipt: 'order_' + appId
       });
 
-      // load and open Razorpay as before...
       await loadRazorpayScript();
 
       const rzp = new window.Razorpay({
@@ -312,26 +363,12 @@ export default function FlipkartLikeApp() {
     }
   }
 
-  // helper to load Razorpay script (copied)
-  function loadRazorpayScript() {
-    return new Promise((resolve, reject) => {
-      if (window.Razorpay) return resolve();
-      const s = document.createElement('script');
-      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('Razorpay failed'));
-      document.body.appendChild(s);
-    });
-  }
-
   // ----------------------------
-  // NEW: Buy Now flow (called from Cart)
+  // BUY NOW flow
   // ----------------------------
   async function handleBuyNow() {
-    // 1) require login
     if (!isLoggedIn) {
       alert('Please sign in to buy now.');
-      // reveal login inputs so user can sign in quickly
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -345,7 +382,6 @@ export default function FlipkartLikeApp() {
         return;
       }
 
-      // fetch addresses
       const host = api.getApiHost?.() || 'http://localhost:8080';
       const resRaw = await fetch(`${host}/api/user/address/${encodeURIComponent(username)}`, {
         method: 'GET',
@@ -356,13 +392,11 @@ export default function FlipkartLikeApp() {
       try { resp = await resRaw.json(); } catch { resp = null; }
 
       if (resRaw.ok && Array.isArray(resp) && resp.length > 0) {
-        // show selection modal
         setAddrChoices(resp);
         setAddrModalOpen(true);
       } else {
-        // no addresses: ask for manual entry (at minimum need pincode)
-        setManualAddr({ line1: '', pincode: '' });
         setAddrChoices([]);
+        setManualAddr({ line1: '', pincode: '' });
         setAddrModalOpen(true);
       }
     } catch (err) {
@@ -376,16 +410,13 @@ export default function FlipkartLikeApp() {
     }
   }
 
-  // called when user selects an address object or submits manual address
+  // user selected or entered address
   async function onAddressChosen(addr) {
     setAddrModalOpen(false);
-    // store for future use
     setSelectedAddress(addr);
 
-    // compute weight
     const weight = computeCartWeight();
 
-    // call shipping availability API
     try {
       const host = api.getApiHost?.() || 'http://localhost:8080';
       const body = {
@@ -404,7 +435,6 @@ export default function FlipkartLikeApp() {
       let shippingResp;
       try { shippingResp = await respRaw.json(); } catch { shippingResp = null; }
 
-      // Try to read totalPayable from common shapes
       let fee = 0;
       if (!shippingResp) {
         fee = 0;
@@ -419,7 +449,6 @@ export default function FlipkartLikeApp() {
       } else if (shippingResp.total && typeof shippingResp.total === 'number') {
         fee = shippingResp.total;
       } else {
-        // best effort: try to find nested courier choice
         try {
           const candidate = shippingResp.available_courier_companies?.[0] || shippingResp.data?.available_courier_companies?.[0];
           if (candidate && (candidate.totalPayable || candidate.total_payable || candidate.total)) {
@@ -430,8 +459,8 @@ export default function FlipkartLikeApp() {
 
       fee = Number(isNaN(fee) ? 0 : fee);
       setDeliveryFee(fee);
+      setShippingChecked(true); // mark shipping check succeeded
 
-      // show cart drawer (with updated totals)
       setIsCartOpen(true);
 
       if (fee > 0) {
@@ -439,14 +468,12 @@ export default function FlipkartLikeApp() {
       } else {
         alert('Delivery not available or free. Proceed to checkout.');
       }
-
     } catch (err) {
       console.error('Shipping check failed', err);
       alert('Shipping check failed. Please try again.');
     }
   }
 
-  // UI helpers for address modal actions
   function chooseAddrFromList(a) { onAddressChosen(a); }
   function submitManualAddr() {
     if (!manualAddr.pincode) return alert('Please enter delivery pincode');
@@ -459,11 +486,9 @@ export default function FlipkartLikeApp() {
   // ----------------------------
   return (
     <div className="min-h-screen bg-gray-50">
-
       {/* HEADER */}
       <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-4 py-3">
-
           <div className="flex items-center">
             <img src="/smartsale.png" alt="SmartSale" className="w-16 h-16 object-contain mr-2" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           </div>
@@ -522,11 +547,12 @@ export default function FlipkartLikeApp() {
         onDec={dec}
         onRemove={removeFromCart}
         onPay={pay}
-        onBuyNow={handleBuyNow}       // NEW: pass buy handler
+        onBuyNow={handleBuyNow}
         open={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        deliveryFee={deliveryFee}     // NEW: show delivery fee
+        deliveryFee={deliveryFee}
         selectedAddress={selectedAddress}
+        shippingChecked={shippingChecked}
       />
 
       {/* SIGNUP MODAL */}
