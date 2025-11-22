@@ -1,5 +1,8 @@
-// App.jsx
+// FlipkartLikeApp.jsx
+// Layout reference image: /mnt/data/layout1.png
+
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import axios from 'axios';
 import { api, getToken, setToken, setUser, getSession } from './services/api';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
@@ -10,7 +13,6 @@ export default function FlipkartLikeApp() {
   // STATES
   // ----------------------------
   const [products, setProducts] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
 
   const [cart, setCart] = useState({});
@@ -53,95 +55,102 @@ export default function FlipkartLikeApp() {
   const [totalElements, setTotalElements] = useState(0);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
+  // Axios controller refs for cancellation
+  const productsCtrlRef = useRef(null);
+  const signupCtrlRef = useRef(null);
+  const addrCtrlRef = useRef(null);
+  const shippingCtrlRef = useRef(null);
+
   // ----------------------------
-  // image URL helper
+  // image URL helper (stable)
   // ----------------------------
-  function imageUrlForSku(sku, ext = 'png') {
+  const imageUrlForSku = useCallback((sku, ext = 'png') => {
     if (!sku) return '/placeholder.png';
     const repoUser = 'yathiraju';
     const repo = 'smartsale-images';
     const version = 'test';
     return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
-  }
+  }, []);
 
   // ----------------------------
-  // FETCH PRODUCTS (paged, abortable)
+  // Helper: base axios instance for host (stable)
   // ----------------------------
-  const fetchProducts = useCallback(async ({ q = '', p = page, s = size, sortBy = sort } = {}) => {
-    setLoadingProducts(true);
+  const getHttp = useCallback(() => {
+    const host = api.getApiHost?.() || 'http://localhost:8080';
+    return axios.create({ baseURL: host, timeout: 30000 });
+  }, []);
 
-    // Abort previous fetch if present
-    if (fetchProducts._ctrl) {
-      try { fetchProducts._ctrl.abort(); } catch (_) { /* ignore */ }
-    }
-    const ctrl = new AbortController();
-    fetchProducts._ctrl = ctrl;
+  // ----------------------------
+  // FETCH PRODUCTS (paged, axios + AbortController)
+  // stable useCallback so effect deps are safe
+  // ----------------------------
+ // ---------- corrected fetchProducts ----------
+ const fetchProducts = useCallback(async ({ q = '', p, s, sortBy } = {}) => {
+   setLoadingProducts(true);
 
-    try {
-      const host = api.getApiHost?.() || 'http://localhost:8080';
-      const params = new URLSearchParams();
-      params.set('page', String(Math.max(0, Number(p || 0))));
-      params.set('size', String(Math.max(1, Number(s || 20))));
-      params.set('sort', String(sortBy || 'name,asc'));
-      if (q && String(q).trim()) params.set('query', String(q).trim());
+   // cancel previous products request
+   if (productsCtrlRef.current) {
+     try { productsCtrlRef.current.abort(); } catch (_) {}
+   }
+   const ctrl = new AbortController();
+   productsCtrlRef.current = ctrl;
+   const http = getHttp();
 
-      const url = `${host}/api/products/page?${params.toString()}`;
+   try {
+     // Use provided params, fallback to safe defaults (do NOT read outer page/size/sort)
+     const pageNum = Math.max(0, Number(p ?? 0));
+     const sizeNum = Math.max(1, Number(s ?? 20));
+     const sortParam = sortBy || 'name,asc';
 
-      const resRaw = await fetch(url, { method: 'GET', signal: ctrl.signal });
-      if (!resRaw.ok) {
-        let errBody = '';
-        try { errBody = await resRaw.text(); } catch (_) {}
-        throw new Error(`Products fetch failed: ${resRaw.status} ${errBody}`);
-      }
-      const data = await resRaw.json();
+     const params = {
+       page: pageNum,
+       size: sizeNum,
+       sort: sortParam
+     };
+     if (q && String(q).trim()) params.query = String(q).trim();
 
-      // data is Spring Page<Product>
-      const list = Array.isArray(data?.content) ? data.content : [];
-      const mapped = list.map(pObj => ({
-        ...pObj,
-        image: pObj.sku ? imageUrlForSku(pObj.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(pObj.name || 'Product')}`
-      }));
+     const res = await http.get('/api/products/page', { params, signal: ctrl.signal });
+     const data = res.data;
 
-      // Replace current page content
-      setProducts(mapped);
-      setFiltered(mapped);
+     const list = Array.isArray(data?.content) ? data.content : [];
+     const mapped = list.map(pObj => ({
+       ...pObj,
+       image: pObj.sku ? imageUrlForSku(pObj.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(pObj.name || 'Product')}`
+     }));
 
-      setTotalPages(Number(data?.totalPages ?? 0));
-      setTotalElements(Number(data?.totalElements ?? 0));
-      setPage(Number(data?.number ?? p ?? 0));
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        // ignore aborted requests
-      } else {
-        console.error('fetchProducts failed', err);
-        // show a non-blocking message
-        // (alert can be annoying on frequent calls; use console and optionally a toast)
-        alert('Cannot load products (server error)');
-      }
-    } finally {
-      setLoadingProducts(false);
-      fetchProducts._ctrl = null;
-    }
-  }, [imageUrlForSku, page, size, sort]);
+     setProducts(mapped);
+     setTotalPages(Number(data?.totalPages ?? 0));
+     setTotalElements(Number(data?.totalElements ?? 0));
+     setPage(Number(data?.number ?? pageNum)); // use returned page number or the requested one
+   } catch (err) {
+     const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
+     if (!isCanceled) {
+       console.error('fetchProducts failed', err);
+       alert('Cannot load products (server error)');
+     }
+   } finally {
+     setLoadingProducts(false);
+     productsCtrlRef.current = null;
+   }
+ }, [getHttp, imageUrlForSku]);
+ // ---------- end corrected fetchProducts ----------
+
 
   // ----------------------------
   // DEBOUNCE SEARCH (calls server)
   // ----------------------------
   useEffect(() => {
     const tid = setTimeout(() => {
-      // reset to first page for new query
       setPage(0);
       fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
     }, 350);
     return () => clearTimeout(tid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, size, sort]); // we intentionally don't add fetchProducts to deps to avoid repeat during typing; fetchProducts uses stable variables
+  }, [search, size, sort, fetchProducts]);
 
-  // re-fetch when page/size/sort changes (e.g., pagination clicks)
+  // Re-fetch when page/size/sort changes (user clicks)
   useEffect(() => {
     fetchProducts({ q: search, p: page, s: size, sortBy: sort });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, size, sort]); // fetchProducts used via closure; safe pattern here
+  }, [page, size, sort, fetchProducts, search]);
 
   // ----------------------------
   // LOGIN / LOGOUT
@@ -159,7 +168,6 @@ export default function FlipkartLikeApp() {
         localStorage.setItem('rzp_username', userName);
         setUsernameDisplay(userName);
         setIsLoggedIn(true);
-        // refresh products (in case some products are gated or different for user)
         fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
       } else throw new Error('No token');
     } catch (e) {
@@ -174,14 +182,13 @@ export default function FlipkartLikeApp() {
     setIsLoggedIn(false);
     setUsernameDisplay('');
     try { localStorage.removeItem('rzp_username'); } catch (_) {}
-    // clear any stored address/shipping
     setSelectedAddress(null);
     setDeliveryFee(0);
     setShippingChecked(false);
   }
 
   // ----------------------------
-  // SIGNUP
+  // SIGNUP (axios)
   // ----------------------------
   async function signupSubmit(e) {
     e.preventDefault();
@@ -190,6 +197,15 @@ export default function FlipkartLikeApp() {
       return alert('Provide username, email, password');
 
     setSignupLoading(true);
+
+    // cancel previous signup call if any
+    if (signupCtrlRef.current) {
+      try { signupCtrlRef.current.abort(); } catch (_) {}
+    }
+    const ctrl = new AbortController();
+    signupCtrlRef.current = ctrl;
+    const http = getHttp();
+
     try {
       const payload = {
         users: {
@@ -210,27 +226,23 @@ export default function FlipkartLikeApp() {
         lng: signupData.lng ? Number(signupData.lng) : null
       };
 
-      const host = api.getApiHost?.() || 'http://localhost:8080';
-      const resRaw = await fetch(host + '/api/signup', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      let res;
-      try { res = await resRaw.json(); } catch { res = await resRaw.text(); }
-
-      if (resRaw.ok) {
+      const res = await http.post('/api/signup', payload, { signal: ctrl.signal, headers: { 'Content-Type': 'application/json' } });
+      if (res.status >= 200 && res.status < 300) {
         alert('Signup successful. You can now log in.');
         setShowSignup(false);
         if (usernameRef.current) usernameRef.current.value = signupData.username;
       } else {
-        alert('Signup failed: ' + (res?.message || JSON.stringify(res)));
+        alert('Signup failed: ' + JSON.stringify(res.data || res.statusText || res.status));
       }
-    } catch (e) {
-      console.error(e);
-      alert('Signup request failed');
+    } catch (err) {
+      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
+      if (!isCanceled) {
+        console.error('Signup request failed', err);
+        alert('Signup request failed');
+      }
     } finally {
       setSignupLoading(false);
+      signupCtrlRef.current = null;
     }
   }
   function signupFieldChange(k, v) { setSignupData(prev => ({ ...prev, [k]: v })); }
@@ -306,7 +318,7 @@ export default function FlipkartLikeApp() {
   }
 
   // ----------------------------
-  // SAVE CART & PAYMENT
+  // SAVE CART & PAYMENT (unchanged uses api helper)
   // ----------------------------
   async function saveCart() {
     try {
@@ -424,7 +436,7 @@ export default function FlipkartLikeApp() {
   }
 
   // ----------------------------
-  // BUY NOW & ADDRESS FLOW (unchanged)
+  // BUY NOW & ADDRESS FLOW (axios)
   // ----------------------------
   async function handleBuyNow() {
     if (!isLoggedIn) {
@@ -434,6 +446,15 @@ export default function FlipkartLikeApp() {
     }
 
     setAddrLoading(true);
+
+    // cancel previous addr request
+    if (addrCtrlRef.current) {
+      try { addrCtrlRef.current.abort(); } catch (_) {}
+    }
+    const ctrl = new AbortController();
+    addrCtrlRef.current = ctrl;
+    const http = getHttp();
+
     try {
       const username = localStorage.getItem('rzp_username') || usernameDisplay;
       if (!username) {
@@ -442,16 +463,10 @@ export default function FlipkartLikeApp() {
         return;
       }
 
-      const host = api.getApiHost?.() || 'http://localhost:8080';
-      const resRaw = await fetch(`${host}/api/user/address/${encodeURIComponent(username)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await http.get(`/api/user/address/${encodeURIComponent(username)}`, { signal: ctrl.signal });
+      const resp = res.data;
 
-      let resp;
-      try { resp = await resRaw.json(); } catch { resp = null; }
-
-      if (resRaw.ok && Array.isArray(resp) && resp.length > 0) {
+      if (Array.isArray(resp) && resp.length > 0) {
         const hasValid = resp.some(a => isValidPincode(a?.pincode));
         if (!hasValid) {
           setAddrChoices([]);
@@ -467,67 +482,21 @@ export default function FlipkartLikeApp() {
         setAddrModalOpen(true);
       }
     } catch (err) {
-      console.error('Fetch addresses failed', err);
-      alert('Failed to fetch addresses. Please enter address manually.');
-      setAddrChoices([]);
-      setManualAddr({ line1: '', pincode: '' });
-      setAddrModalOpen(true);
-    } finally {
-      setAddrLoading(false);
-    }
-  }
-
-  async function openChangeAddressModal() {
-    if (!isLoggedIn) {
-      alert('Please sign in to change address.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    resetShippingState();
-    setAddrLoading(true);
-    try {
-      const username = localStorage.getItem('rzp_username') || usernameDisplay;
-      if (!username) {
-        alert('Username not found. Please log in again.');
-        setIsLoggedIn(false);
-        return;
-      }
-
-      const host = api.getApiHost?.() || 'http://localhost:8080';
-      const resRaw = await fetch(`${host}/api/user/address/${encodeURIComponent(username)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      let resp;
-      try { resp = await resRaw.json(); } catch { resp = null; }
-
-      if (resRaw.ok && Array.isArray(resp) && resp.length > 0) {
-        const hasValid = resp.some(a => isValidPincode(a?.pincode));
-        if (!hasValid) {
-          setAddrChoices([]);
-          setManualAddr({ line1: '', pincode: '' });
-          setAddrModalOpen(true);
-        } else {
-          setAddrChoices(resp);
-          setAddrModalOpen(true);
-        }
-      } else {
+      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
+      if (!isCanceled) {
+        console.error('Fetch addresses failed', err);
+        alert('Failed to fetch addresses. Please enter address manually.');
         setAddrChoices([]);
         setManualAddr({ line1: '', pincode: '' });
         setAddrModalOpen(true);
       }
-    } catch (err) {
-      console.error('Fetch addresses failed', err);
-      alert('Failed to fetch addresses. Please enter address manually.');
-      setAddrChoices([]);
-      setManualAddr({ line1: '', pincode: '' });
-      setAddrModalOpen(true);
     } finally {
       setAddrLoading(false);
+      addrCtrlRef.current = null;
     }
   }
+
+
 
   async function onAddressChosen(addr) {
     const pincode = addr?.pincode || addr?.postalCode || addr?.zip;
@@ -545,8 +514,15 @@ export default function FlipkartLikeApp() {
 
     const weight = computeCartWeight();
 
+    // cancel previous shipping check
+    if (shippingCtrlRef.current) {
+      try { shippingCtrlRef.current.abort(); } catch (_) {}
+    }
+    const ctrl = new AbortController();
+    shippingCtrlRef.current = ctrl;
+    const http = getHttp();
+
     try {
-      const host = api.getApiHost?.() || 'http://localhost:8080';
       const body = {
         pickup_postcode: null,
         delivery_postcode: normalized.pincode,
@@ -554,14 +530,8 @@ export default function FlipkartLikeApp() {
         weight: Number(weight || 0)
       };
 
-      const respRaw = await fetch(`${host}/api/shipping/check/availability`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      let shippingResp;
-      try { shippingResp = await respRaw.json(); } catch { shippingResp = null; }
+      const res = await http.post('/api/shipping/check/availability', body, { signal: ctrl.signal, headers: { 'Content-Type': 'application/json' } });
+      const shippingResp = res.data;
 
       let fee = 0;
       if (!shippingResp) {
@@ -596,8 +566,13 @@ export default function FlipkartLikeApp() {
         alert('Delivery not available. Choose different deliver address.');
       }
     } catch (err) {
-      console.error('Shipping check failed', err);
-      alert('Shipping check failed. Please try again.');
+      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
+      if (!isCanceled) {
+        console.error('Shipping check failed', err);
+        alert('Shipping check failed. Please try again.');
+      }
+    } finally {
+      shippingCtrlRef.current = null;
     }
   }
 
@@ -614,7 +589,6 @@ export default function FlipkartLikeApp() {
   // Initial fetch on mount
   // ----------------------------
   useEffect(() => {
-    // initial page load
     fetchProducts({ q: search, p: page, s: size, sortBy: sort });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
@@ -630,85 +604,98 @@ export default function FlipkartLikeApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* HEADER */}
+    <>
+      {/* HEADER - Flipkart-style (3 rows) */}
       <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
-        <div className="max-w-7xl mx-auto px-4 flex items-center gap-4 py-3">
-          <div className="flex items-center">
-            <img src="/smartsale.png" alt="SmartSale" className="w-16 h-16 object-contain mr-2" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          </div>
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          {/* ROW 1: Logo | Search | Auth + Cart */}
+          <div className="flex items-center gap-4">
+            <div className="flex-none">
+              <img src="/smartsale.png" alt="SmartSale" className="w-16 h-16 object-contain mr-2" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            </div>
 
-          <div className="flex-1">
-            <div className="flex">
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full rounded-l px-3 py-1 text-black"
-              />
-              <button
-                className="bg-yellow-400 text-black px-4 rounded-r"
-                onClick={() => { setPage(0); fetchProducts({ q: search, p: 0, s: size, sortBy: sort }); }}
-              >
-                Search
+            <div className="flex-1">
+              <div className="flex">
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full rounded-l px-3 py-1 text-black"
+                />
+                <button
+                  className="bg-yellow-400 text-black px-4 rounded-r"
+                  onClick={() => { setPage(0); fetchProducts({ q: search, p: 0, s: size, sortBy: sort }); }}
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-none flex items-center gap-3">
+              {!isLoggedIn ? (
+                <>
+                  <div className="hidden sm:flex items-center gap-2">
+                    <input ref={usernameRef} placeholder="Username" className="text-black px-2 py-1 rounded" />
+                    <input ref={passwordRef} type="password" placeholder="Password" className="text-black px-2 py-1 rounded" />
+                    <button onClick={login} className="bg-white text-blue-600 px-3 py-1 rounded">Login</button>
+                  </div>
+                  <button onClick={() => setShowSignup(true)} className="bg-green-500 text-white px-3 py-1 rounded">Sign Up</button>
+                </>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">Hello, <b>{usernameDisplay}</b></span>
+                  <button onClick={logout} className="bg-white text-red-600 px-3 py-1 rounded">Logout</button>
+                </>
+              )}
+
+              <button className="bg-white text-blue-600 px-4 py-1 rounded ml-2" onClick={() => setIsCartOpen(true)}>
+                Cart 🛒({totalItems})
               </button>
             </div>
           </div>
 
-          {!isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <input ref={usernameRef} placeholder="Username" className="text-black px-2 py-1 rounded" />
-              <input ref={passwordRef} type="password" placeholder="Password" className="text-black px-2 py-1 rounded" />
-              <button onClick={login} className="bg-white text-blue-600 px-3 py-1 rounded">Login</button>
-              <button onClick={() => setShowSignup(true)} className="bg-green-500 text-white px-3 py-1 rounded">Sign Up</button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span>Hello, <b>{usernameDisplay}</b></span>
-              <button onClick={logout} className="bg-white text-red-600 px-3 py-1 rounded">Logout</button>
-            </div>
-          )}
-
-          {/* Cart + Shipping badge + Change address */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {shippingChecked && deliveryFee != null && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div style={{
-                  background: '#10b981',
-                  color: '#fff',
-                  padding: '4px 8px',
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 700
-                }}>
-                  Shipping ₹{Number(deliveryFee || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-
-                {/* Change address button */}
+          {/* ROW 2: Categories */}
+          <div className="mt-3 overflow-x-auto">
+            <div className="flex gap-3">
+              {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks', 'Home', 'Toys', 'Beauty'].map(c => (
                 <button
-                  onClick={openChangeAddressModal}
-                  style={{
-                    background: '#0ea5e9',
-                    color: '#fff',
-                    padding: '6px 10px',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
+                  key={c}
+                  className="px-3 py-1 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap"
+                  onClick={() => { setSearch(c); setPage(0); fetchProducts({ q: c, p: 0, s: size, sortBy: sort }); }}
                 >
-                  Change
+                  {c}
                 </button>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
 
-            <div className="ml-4 flex items-center gap-2">
+          {/* ROW 3: Filters / pagination */}
+          <div className="mt-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <label className="text-white text-sm hidden sm:inline">Show</label>
+              <select value={size} onChange={e => { setSize(Number(e.target.value)); setPage(0); }} className="text-black px-2 py-1 rounded">
+                <option value={8}>8</option>
+                <option value={12}>12</option>
+                <option value={20}>20</option>
+                <option value={48}>48</option>
+              </select>
+
+              <label className="text-white text-sm hidden sm:inline">Sort</label>
+              <select value={sort} onChange={e => { setSort(e.target.value); setPage(0); }} className="text-black px-2 py-1 rounded">
+                <option value="name,asc">Name ↑</option>
+                <option value="name,desc">Name ↓</option>
+                <option value="price,asc">Price ↑</option>
+                <option value="price,desc">Price ↓</option>
+                <option value="id,desc">Newest</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3">
               <button
                 disabled={page <= 0 || loadingProducts}
                 onClick={() => setPage(Math.max(0, page - 1))}
-                className="px-2 py-1 bg-white rounded"
+                className="px-2 py-1 bg-white text-blue-600 rounded disabled:opacity-50"
               >
                 Prev
               </button>
@@ -716,15 +703,11 @@ export default function FlipkartLikeApp() {
               <button
                 disabled={page + 1 >= totalPages || loadingProducts}
                 onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                className="px-2 py-1 bg-white rounded"
+                className="px-2 py-1 bg-white text-blue-600 rounded disabled:opacity-50"
               >
                 Next
               </button>
             </div>
-
-            <button className="bg-white text-blue-600 px-4 py-1 rounded" onClick={() => setIsCartOpen(true)}>
-              Cart 🛒({totalItems})
-            </button>
           </div>
         </div>
       </header>
@@ -732,7 +715,10 @@ export default function FlipkartLikeApp() {
       {/* MAIN GRID */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex gap-3 overflow-x-auto pb-4">
-          {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks'].map(c => (<span key={c} className="px-3 py-1 bg-white rounded shadow">{c}</span>))}
+          {/* category chips repeated in main for accessibility on large screens */}
+          {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks'].map(c => (
+            <span key={c} className="px-3 py-1 bg-white rounded shadow">{c}</span>
+          ))}
         </div>
 
         {loadingProducts ? (
@@ -743,7 +729,7 @@ export default function FlipkartLikeApp() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filtered.map(p => (
+            {products.map(p => (
               <div key={p.id ?? p._id ?? p.sku} className="bg-white p-3 rounded shadow hover:shadow-lg flex flex-col h-full">
                 <div className="flex-none">
                   <img src={p.image} alt={p.name} className="w-full h-40 object-contain mb-2 rounded" />
@@ -839,7 +825,6 @@ export default function FlipkartLikeApp() {
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }
