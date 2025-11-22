@@ -722,13 +722,6 @@ export default function FlipkartLikeApp() {
 
       {/* MAIN GRID */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {/* category chips repeated in main for accessibility on large screens */}
-          {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks'].map(c => (
-            <span key={c} className="px-3 py-1 bg-white rounded shadow">{c}</span>
-          ))}
-        </div>
-
         {loadingProducts ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: size > 0 ? Math.min(size, 8) : 8 }).map((_, i) => (
