@@ -656,19 +656,27 @@ export default function FlipkartLikeApp() {
           </div>
 
           {/* ROW 2: Categories */}
-          <div className="mt-3 overflow-x-auto">
-            <div className="flex gap-3">
-              {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks', 'Home', 'Toys', 'Beauty'].map(c => (
-                <button
-                  key={c}
-                  className="px-3 py-1 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap"
-                  onClick={() => { setSearch(c); setPage(0); fetchProducts({ q: c, p: 0, s: size, sortBy: sort }); }}
-                >
-                  {c}
-                </button>
-              ))}
+          {/* ROW 2: FULL-WIDTH Categories (replace existing ROW 2) */}
+          {/* this block sits directly under the top inner container inside <header> */}
+          <div className="w-full bg-blue-500"> {/* full width background */}
+            <div className="max-w-7xl mx-auto px-4 py-2">
+              <div
+                className="grid gap-3"
+                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}
+              >
+                {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks', 'Home', 'Toys', 'Beauty'].map(c => (
+                  <button
+                    key={c}
+                    className="px-3 py-2 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap min-w-[120px]"
+                    onClick={() => { setSearch(c); setPage(0); fetchProducts({ q: c, p: 0, s: size, sortBy: sort }); }}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+
 
           {/* ROW 3: Filters / pagination */}
           <div className="mt-3 flex items-center justify-between gap-4">
