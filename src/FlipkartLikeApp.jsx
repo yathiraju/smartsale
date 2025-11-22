@@ -1,3 +1,4 @@
+// App.jsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api, getToken, setToken, setUser, getSession } from './services/api';
 import ProductCard from './components/ProductCard';
@@ -43,7 +44,17 @@ export default function FlipkartLikeApp() {
   const [addrLoading, setAddrLoading] = useState(false);
 
   // ----------------------------
-  // image URL
+  // PAGINATION / SERVER-SEARCH STATE
+  // ----------------------------
+  const [page, setPage] = useState(0);        // zero-based page
+  const [size, setSize] = useState(20);       // items per page
+  const [sort, setSort] = useState('name,asc');
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // ----------------------------
+  // image URL helper
   // ----------------------------
   function imageUrlForSku(sku, ext = 'png') {
     if (!sku) return '/placeholder.png';
@@ -54,42 +65,83 @@ export default function FlipkartLikeApp() {
   }
 
   // ----------------------------
-  // FETCH PRODUCTS
+  // FETCH PRODUCTS (paged, abortable)
   // ----------------------------
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async ({ q = '', p = page, s = size, sortBy = sort } = {}) => {
+    setLoadingProducts(true);
+
+    // Abort previous fetch if present
+    if (fetchProducts._ctrl) {
+      try { fetchProducts._ctrl.abort(); } catch (_) { /* ignore */ }
+    }
+    const ctrl = new AbortController();
+    fetchProducts._ctrl = ctrl;
+
     try {
-      const res = await api.products();
-      const list = Array.isArray(res) ? res : [];
-      const mapped = list.map(p => ({
-        ...p,
-        image: p.sku ? imageUrlForSku(p.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(p.name || 'Product')}`
+      const host = api.getApiHost?.() || 'http://localhost:8080';
+      const params = new URLSearchParams();
+      params.set('page', String(Math.max(0, Number(p || 0))));
+      params.set('size', String(Math.max(1, Number(s || 20))));
+      params.set('sort', String(sortBy || 'name,asc'));
+      if (q && String(q).trim()) params.set('query', String(q).trim());
+
+      const url = `${host}/api/products/page?${params.toString()}`;
+
+      const resRaw = await fetch(url, { method: 'GET', signal: ctrl.signal });
+      if (!resRaw.ok) {
+        let errBody = '';
+        try { errBody = await resRaw.text(); } catch (_) {}
+        throw new Error(`Products fetch failed: ${resRaw.status} ${errBody}`);
+      }
+      const data = await resRaw.json();
+
+      // data is Spring Page<Product>
+      const list = Array.isArray(data?.content) ? data.content : [];
+      const mapped = list.map(pObj => ({
+        ...pObj,
+        image: pObj.sku ? imageUrlForSku(pObj.sku) : `https://via.placeholder.com/300x300?text=${encodeURIComponent(pObj.name || 'Product')}`
       }));
+
+      // Replace current page content
       setProducts(mapped);
       setFiltered(mapped);
-    } catch (e) {
-      console.error(e);
-      alert('Cannot load products');
+
+      setTotalPages(Number(data?.totalPages ?? 0));
+      setTotalElements(Number(data?.totalElements ?? 0));
+      setPage(Number(data?.number ?? p ?? 0));
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        // ignore aborted requests
+      } else {
+        console.error('fetchProducts failed', err);
+        // show a non-blocking message
+        // (alert can be annoying on frequent calls; use console and optionally a toast)
+        alert('Cannot load products (server error)');
+      }
+    } finally {
+      setLoadingProducts(false);
+      fetchProducts._ctrl = null;
     }
-  }, []);
+  }, [imageUrlForSku, page, size, sort]);
 
   // ----------------------------
-  // SEARCH
+  // DEBOUNCE SEARCH (calls server)
   // ----------------------------
-  const applySearch = useCallback((q = null) => {
-    const query = q !== null ? String(q) : String(search);
-    const s = String(query).trim().toLowerCase();
-    if (!s) {
-      setFiltered(products);
-      return;
-    }
-    setFiltered(products.filter(p =>
-      (String(p.name || '').toLowerCase().includes(s)) ||
-      (p.sku && String(p.sku || '').toLowerCase().includes(s))
-    ));
-  }, [products, search]);
+  useEffect(() => {
+    const tid = setTimeout(() => {
+      // reset to first page for new query
+      setPage(0);
+      fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
+    }, 350);
+    return () => clearTimeout(tid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, size, sort]); // we intentionally don't add fetchProducts to deps to avoid repeat during typing; fetchProducts uses stable variables
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
-  useEffect(() => { applySearch(); }, [applySearch]);
+  // re-fetch when page/size/sort changes (e.g., pagination clicks)
+  useEffect(() => {
+    fetchProducts({ q: search, p: page, s: size, sortBy: sort });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, size, sort]); // fetchProducts used via closure; safe pattern here
 
   // ----------------------------
   // LOGIN / LOGOUT
@@ -107,7 +159,8 @@ export default function FlipkartLikeApp() {
         localStorage.setItem('rzp_username', userName);
         setUsernameDisplay(userName);
         setIsLoggedIn(true);
-        await fetchProducts();
+        // refresh products (in case some products are gated or different for user)
+        fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
       } else throw new Error('No token');
     } catch (e) {
       console.error(e);
@@ -328,22 +381,22 @@ export default function FlipkartLikeApp() {
         amount: rzpOrder.amount,
         currency: rzpOrder.currency,
         order_id: rzpOrder.providerOrderId,
-        name: 'Shop At Low Price',
+        name: 'Shop At Smart Sale',
         description: 'Order ' + appId,
         handler: async (response) => {
           try {
             const body = { ...response, orderId: appId, cartId };
             const cap = await api.capturePayment(body);
             if (cap && String(cap.status).toLowerCase() === 'paid') {
-              alert('Payment successful');
+              alert('Order Placed successful');
               clearCart();
               setIsCartOpen(false);
             } else {
-              alert('Capture failed');
+              alert('Payment failed');
             }
           } catch (e) {
             console.error(e);
-            alert('Capture failed');
+            alert('Payment failed');
           }
         }
       });
@@ -371,7 +424,7 @@ export default function FlipkartLikeApp() {
   }
 
   // ----------------------------
-  // BUY NOW flow
+  // BUY NOW & ADDRESS FLOW (unchanged)
   // ----------------------------
   async function handleBuyNow() {
     if (!isLoggedIn) {
@@ -399,7 +452,6 @@ export default function FlipkartLikeApp() {
       try { resp = await resRaw.json(); } catch { resp = null; }
 
       if (resRaw.ok && Array.isArray(resp) && resp.length > 0) {
-        // ensure addresses have pincode; if not, force manual entry
         const hasValid = resp.some(a => isValidPincode(a?.pincode));
         if (!hasValid) {
           setAddrChoices([]);
@@ -425,7 +477,6 @@ export default function FlipkartLikeApp() {
     }
   }
 
-  // New: open address modal when user clicks "Change address"
   async function openChangeAddressModal() {
     if (!isLoggedIn) {
       alert('Please sign in to change address.');
@@ -433,9 +484,7 @@ export default function FlipkartLikeApp() {
       return;
     }
 
-    // reset shipping state so user will re-check after choosing new address
     resetShippingState();
-
     setAddrLoading(true);
     try {
       const username = localStorage.getItem('rzp_username') || usernameDisplay;
@@ -480,13 +529,10 @@ export default function FlipkartLikeApp() {
     }
   }
 
-  // user selected or entered address
   async function onAddressChosen(addr) {
-    // validate pincode if available
     const pincode = addr?.pincode || addr?.postalCode || addr?.zip;
     if (!isValidPincode(pincode)) {
       alert('Selected address has invalid/missing pincode. Please enter a valid 6-digit pincode.');
-      // open manual entry prefilled if possible
       setManualAddr({ line1: addr?.line1 || addr?.name || '', pincode: '' });
       setAddrChoices([]);
       setAddrModalOpen(true);
@@ -494,7 +540,6 @@ export default function FlipkartLikeApp() {
     }
 
     setAddrModalOpen(false);
-    // normalize address object to contain `pincode` and `line1`
     const normalized = { ...addr, pincode: String(pincode).trim(), line1: addr?.line1 || addr?.name || '' };
     setSelectedAddress(normalized);
 
@@ -542,13 +587,13 @@ export default function FlipkartLikeApp() {
 
       fee = Number(isNaN(fee) ? 0 : fee);
       setDeliveryFee(fee);
-      setShippingChecked(true); // mark shipping check succeeded
+      setShippingChecked(true);
       setIsCartOpen(true);
 
       if (fee > 0) {
         alert(`Delivery fee ₹${fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} added.`);
       } else {
-        alert('Delivery not available or free. Proceed to checkout.');
+        alert('Delivery not available. Choose different deliver address.');
       }
     } catch (err) {
       console.error('Shipping check failed', err);
@@ -566,8 +611,24 @@ export default function FlipkartLikeApp() {
   }
 
   // ----------------------------
+  // Initial fetch on mount
+  // ----------------------------
+  useEffect(() => {
+    // initial page load
+    fetchProducts({ q: search, p: page, s: size, sortBy: sort });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
+
+  // ----------------------------
   // RENDER
   // ----------------------------
+  function computeRange(pageLocal, sizeLocal, total) {
+    if (!total) return '0 items';
+    const start = pageLocal * sizeLocal + 1;
+    const end = Math.min(total, (pageLocal + 1) * sizeLocal);
+    return `${start}–${end}`;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* HEADER */}
@@ -579,8 +640,19 @@ export default function FlipkartLikeApp() {
 
           <div className="flex-1">
             <div className="flex">
-              <input type="text" placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} className="w-full rounded-l px-3 py-1 text-black" />
-              <button className="bg-yellow-400 text-black px-4 rounded-r" onClick={() => applySearch(search)}>Search</button>
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full rounded-l px-3 py-1 text-black"
+              />
+              <button
+                className="bg-yellow-400 text-black px-4 rounded-r"
+                onClick={() => { setPage(0); fetchProducts({ q: search, p: 0, s: size, sortBy: sort }); }}
+              >
+                Search
+              </button>
             </div>
           </div>
 
@@ -632,6 +704,24 @@ export default function FlipkartLikeApp() {
               </div>
             )}
 
+            <div className="ml-4 flex items-center gap-2">
+              <button
+                disabled={page <= 0 || loadingProducts}
+                onClick={() => setPage(Math.max(0, page - 1))}
+                className="px-2 py-1 bg-white rounded"
+              >
+                Prev
+              </button>
+              <span className="text-white text-sm">Page {Number(page) + 1} / {Math.max(1, totalPages)}</span>
+              <button
+                disabled={page + 1 >= totalPages || loadingProducts}
+                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                className="px-2 py-1 bg-white rounded"
+              >
+                Next
+              </button>
+            </div>
+
             <button className="bg-white text-blue-600 px-4 py-1 rounded" onClick={() => setIsCartOpen(true)}>
               Cart 🛒({totalItems})
             </button>
@@ -645,17 +735,30 @@ export default function FlipkartLikeApp() {
           {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks'].map(c => (<span key={c} className="px-3 py-1 bg-white rounded shadow">{c}</span>))}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filtered.map(p => (
-            <div key={p.id ?? p._id ?? p.sku} className="bg-white p-3 rounded shadow hover:shadow-lg flex flex-col h-full">
-              <div className="flex-none">
-                <img src={p.image} alt={p.name} className="w-full h-40 object-contain mb-2 rounded" />
+        {loadingProducts ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: size > 0 ? Math.min(size, 8) : 8 }).map((_, i) => (
+              <div key={i} className="bg-white p-3 rounded shadow animate-pulse h-64" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filtered.map(p => (
+              <div key={p.id ?? p._id ?? p.sku} className="bg-white p-3 rounded shadow hover:shadow-lg flex flex-col h-full">
+                <div className="flex-none">
+                  <img src={p.image} alt={p.name} className="w-full h-40 object-contain mb-2 rounded" />
+                </div>
+                <div className="flex-1">
+                  <ProductCard p={p} cart={cart} onAdd={addToCart} onInc={inc} onDec={dec} onRemove={removeFromCart} />
+                </div>
               </div>
-              <div className="flex-1">
-                <ProductCard p={p} cart={cart} onAdd={addToCart} onInc={inc} onDec={dec} onRemove={removeFromCart} />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
+
+        {/* page summary */}
+        <div className="mt-4 text-sm text-gray-600">
+          {totalElements ? `Showing ${computeRange(page, size, totalElements)} of ${totalElements} products` : 'No products to display'}
         </div>
       </main>
 
