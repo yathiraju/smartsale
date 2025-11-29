@@ -34,6 +34,14 @@ export default function FlipkartLikeApp() {
     pincode: '', country: 'IN', lat: '', lng: ''
   });
 
+  // guest address (when user is NOT logged in and clicks Buy Now)
+    const [guestAddrModalOpen, setGuestAddrModalOpen] = useState(false);
+    const [guestAddress, setGuestAddress] = useState({
+      name: '', phone: '', addressLine1: '', addressLine2: '',
+      city: '', state: '', pincode: '', country: 'IN'
+    });
+    const [guestAddrSubmitting, setGuestAddrSubmitting] = useState(false);
+
   // NEW: address & shipping state
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -435,66 +443,117 @@ export default function FlipkartLikeApp() {
     return /^[1-9][0-9]{5}$/.test(String(pin || '').trim());
   }
 
-  // ----------------------------
-  // BUY NOW & ADDRESS FLOW (axios)
-  // ----------------------------
+  function isValidPhone(phone) {
+      return /^\d{10}$/.test(String(phone || '').trim());
+    }
+
+  async function submitGuestAddress(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (guestAddrSubmitting) return;
+
+      // validation (mirror AddressDto constraints)
+      const { name, phone, addressLine1, city, state, pincode, country } = guestAddress;
+      if (!String(name || '').trim()) return alert('Name is required');
+      if (!isValidPhone(phone)) return alert('Phone must be a 10-digit number');
+      if (!String(addressLine1 || '').trim()) return alert('Address line1 is required');
+      if (!String(city || '').trim()) return alert('City is required');
+      if (!String(state || '').trim()) return alert('State is required');
+      if (!isValidPincode(pincode)) return alert('Pincode must be a 6-digit number');
+      if (!String(country || '').trim()) return alert('Country is required');
+
+      setGuestAddrSubmitting(true);
+
+      try {
+        // normalize to the shape expected by onAddressChosen (it reads pincode and line1)
+        const addr = {
+          name: guestAddress.name,
+          phone: guestAddress.phone,
+          line1: guestAddress.addressLine1,
+          line2: guestAddress.addressLine2,
+          city: guestAddress.city,
+          state: guestAddress.state,
+          pincode: guestAddress.pincode,
+          country: guestAddress.country
+        };
+
+        // Save guest address in its own state variable (user requested)
+        setGuestAddress(addr);
+
+        // Close modal and reuse existing flow: call onAddressChosen to perform shipping check + continue
+        setGuestAddrModalOpen(false);
+
+        // call same logic that handles shipping (onAddressChosen does shipping check and opens cart)
+        await onAddressChosen(addr);
+
+      } catch (err) {
+        console.error('Guest address submit failed', err);
+        alert('Failed to check shipping for this address. Please try again.');
+      } finally {
+        setGuestAddrSubmitting(false);
+      }
+    }
+
+
   async function handleBuyNow() {
-    if (!isLoggedIn) {
-      alert('Please sign in to buy now.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setAddrLoading(true);
-
-    // cancel previous addr request
-    if (addrCtrlRef.current) {
-      try { addrCtrlRef.current.abort(); } catch (_) {}
-    }
-    const ctrl = new AbortController();
-    addrCtrlRef.current = ctrl;
-    const http = getHttp();
-
-    try {
-      const username = localStorage.getItem('rzp_username') || usernameDisplay;
-      if (!username) {
-        alert('Username not found. Please log in again.');
-        setIsLoggedIn(false);
+      // if not logged in -> open guest address modal to collect AddressDto-like info
+      if (!isLoggedIn) {
+        // show the guest address modal
+        setGuestAddrModalOpen(true);
+        // scroll to top so modal is visible on small screens
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      const res = await http.get(`/api/user/address/${encodeURIComponent(username)}`, { signal: ctrl.signal });
-      const resp = res.data;
+      // existing logic (when logged in) - unchanged
+      setAddrLoading(true);
 
-      if (Array.isArray(resp) && resp.length > 0) {
-        const hasValid = resp.some(a => isValidPincode(a?.pincode));
-        if (!hasValid) {
+      if (addrCtrlRef.current) {
+        try { addrCtrlRef.current.abort(); } catch (_) {}
+      }
+      const ctrl = new AbortController();
+      addrCtrlRef.current = ctrl;
+      const http = getHttp();
+
+      try {
+        const username = localStorage.getItem('rzp_username') || usernameDisplay;
+        if (!username) {
+          alert('Username not found. Please log in again.');
+          setIsLoggedIn(false);
+          return;
+        }
+
+        const res = await http.get(`/api/user/address/${encodeURIComponent(username)}`, { signal: ctrl.signal });
+        const resp = res.data;
+
+        if (Array.isArray(resp) && resp.length > 0) {
+          const hasValid = resp.some(a => isValidPincode(a?.pincode));
+          if (!hasValid) {
+            setAddrChoices([]);
+            setManualAddr({ line1: '', pincode: '' });
+            setAddrModalOpen(true);
+          } else {
+            setAddrChoices(resp);
+            setAddrModalOpen(true);
+          }
+        } else {
           setAddrChoices([]);
           setManualAddr({ line1: '', pincode: '' });
           setAddrModalOpen(true);
-        } else {
-          setAddrChoices(resp);
+        }
+      } catch (err) {
+        const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
+        if (!isCanceled) {
+          console.error('Fetch addresses failed', err);
+          alert('Failed to fetch addresses. Please enter address manually.');
+          setAddrChoices([]);
+          setManualAddr({ line1: '', pincode: '' });
           setAddrModalOpen(true);
         }
-      } else {
-        setAddrChoices([]);
-        setManualAddr({ line1: '', pincode: '' });
-        setAddrModalOpen(true);
+      } finally {
+        setAddrLoading(false);
+        addrCtrlRef.current = null;
       }
-    } catch (err) {
-      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
-      if (!isCanceled) {
-        console.error('Fetch addresses failed', err);
-        alert('Failed to fetch addresses. Please enter address manually.');
-        setAddrChoices([]);
-        setManualAddr({ line1: '', pincode: '' });
-        setAddrModalOpen(true);
-      }
-    } finally {
-      setAddrLoading(false);
-      addrCtrlRef.current = null;
     }
-  }
 
 
 
@@ -781,6 +840,32 @@ export default function FlipkartLikeApp() {
           </form>
         </div>
       )}
+
+        {/* GUEST ADDRESS MODAL (shown when Buy Now clicked and user not logged in) */}
+        {guestAddrModalOpen && (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+            <form onSubmit={submitGuestAddress} className="bg-white p-6 rounded shadow max-w-lg w-full">
+              <h2 className="text-xl font-bold mb-3">Enter delivery address</h2>
+
+              <div className="grid grid-cols-1 gap-2 text-black">
+                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Phone (10 digits)" value={guestAddress.phone} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Address line 1" value={guestAddress.addressLine1} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Address line 2 (optional)" value={guestAddress.addressLine2} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="City" value={guestAddress.city} onChange={e => setGuestAddress(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="State" value={guestAddress.state} onChange={e => setGuestAddress(prev => ({ ...prev, state: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Country" value={guestAddress.country} onChange={e => setGuestAddress(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button type="button" onClick={() => setGuestAddrModalOpen(false)}>Cancel</button>
+                <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded">{guestAddrSubmitting ? 'Checking...' : 'Continue'}</button>
+              </div>
+            </form>
+          </div>
+        )}
+
 
       {/* ADDRESS SELECTION / MANUAL ENTRY MODAL */}
       {addrModalOpen && (
