@@ -360,6 +360,39 @@ export default function FlipkartLikeApp() {
     });
   }
 
+  // ---------- add helper to normalize delivery address for capture ----------
+  function buildDeliveryAddressForCapture() {
+    // prefer selectedAddress (chosen from saved/manual), fallback to guestAddress
+    const src = selectedAddress || guestAddress || null;
+    if (!src) return null;
+
+    // Map fields to the backend AddressDto shape:
+    // AddressDto(
+    //   name, phone, addressLine1, addressLine2, city, state, pincode, country
+    // )
+    const name = src.name || src.line1 || usernameDisplay || '';
+    const phone = src.phone || src.mobile || ''; // try different keys just in case
+    const addressLine1 = src.line1 || src.addressLine1 || src.address1 || '';
+    const addressLine2 = src.line2 || src.addressLine2 || src.address2 || '';
+    const city = src.city || '';
+    const state = src.state || '';
+    const pincode = String(src.pincode || src.postalCode || src.zip || '').trim();
+    const country = src.country || 'IN';
+
+    return {
+      name,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      pincode,
+      country
+    };
+  }
+  // ---------- end helper ----------
+
+  // ---------- replaced pay() with capture including deliveryAddress ----------
   async function pay() {
     if (paying) return;
     setPaying(true);
@@ -405,8 +438,29 @@ export default function FlipkartLikeApp() {
         description: 'Order ' + appId,
         handler: async (response) => {
           try {
-            const body = { ...response, orderId: appId, cartId };
+            // response contains razorpay_order_id, razorpay_payment_id, razorpay_signature, etc.
+            // Build the capture payload expected by your backend CaptureDTO:
+            // { body: { ... }, deliveryAddress: { name, phone, addressLine1, ... } }
+
+            const deliveryAddress = buildDeliveryAddressForCapture();
+
+            const body = {
+              // map provider response fields to the 'body' map
+              body: {
+                razorpay_order_id: response?.razorpay_order_id || '',
+                razorpay_payment_id: response?.razorpay_payment_id || '',
+                razorpay_signature: response?.razorpay_signature || '',
+                orderId: String(appId || ''),
+                cartId: String(cartId || '')
+              },
+              // include the normalized delivery address (or null)
+              deliveryAddress
+            };
+
+            // call backend capture endpoint — backend will verify signature and persist order + address
             const cap = await api.capturePayment(body);
+
+            // your backend currently inspects providerOrderId/paymentId and calls paymentService.markSuccess(...)
             if (cap && String(cap.status).toLowerCase() === 'paid') {
               alert('Order Placed successful');
               clearCart();
@@ -435,6 +489,8 @@ export default function FlipkartLikeApp() {
       setPaying(false);
     }
   }
+  // ---------- end pay() ----------
+
 
   // ----------------------------
   // Utilities
