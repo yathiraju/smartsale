@@ -749,7 +749,7 @@ async function submitManualAddrForLoggedIn(e) {
       setIsCartOpen(true);
 
       if (fee > 0) {
-        alert(`Delivery fee ₹${fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} added.`);
+        //alert(`Delivery fee ₹${fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} added.`);
       } else {
         alert('Delivery not available. Choose different deliver address.');
       }
