@@ -817,7 +817,7 @@ async function submitManualAddrForLoggedIn(e) {
             <div className="flex-none flex items-center gap-3">
               {!isLoggedIn ? (
                 <>
-                  <div className="hidden sm:flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <input ref={usernameRef} placeholder="Username" className="text-black px-2 py-1 rounded" />
                     <input ref={passwordRef} type="password" placeholder="Password" className="text-black px-2 py-1 rounded" />
                     <button onClick={login} className="bg-white text-blue-600 px-3 py-1 rounded">Login</button>
