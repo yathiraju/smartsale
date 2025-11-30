@@ -895,7 +895,7 @@ async function submitManualAddrForLoggedIn(e) {
               className="grid gap-3"
               style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}
             >
-              {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks', 'Home', 'Toys', 'Beauty'].map(c => (
+              {['Electronics', 'Clothing', 'Grocery', 'Stationery'].map(c => (
                 <button
                   key={c}
                   className="px-3 py-2 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap min-w-[120px]"
