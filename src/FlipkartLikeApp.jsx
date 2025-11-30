@@ -787,120 +787,128 @@ async function submitManualAddrForLoggedIn(e) {
 
   return (
     <>
-      {/* HEADER - Flipkart-style (3 rows) */}
+      {/* --- REPLACE HEADER WITH THIS BLOCK --- */}
       <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
         <div className="max-w-7xl mx-auto px-4 py-2">
-          {/* ROW 1: Logo | Search | Auth + Cart */}
+          {/* ROW 1: Logo | Search | Cart */}
           <div className="flex items-center gap-4">
+            {/* Logo */}
             <div className="flex-none">
-              <img src="/smartsale.png" alt="SmartSale" className="w-16 h-16 object-contain mr-2" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <img
+                src="/smartsale.png"
+                alt="SmartSale"
+                className="w-12 h-12 sm:w-16 sm:h-16 object-contain"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             </div>
 
-            <div className="flex-1">
-              <div className="flex">
+            {/* Search (center) */}
+            <div className="flex-1 min-w-0"> {/* min-w-0 is important for proper shrinking */}
+              <div className="flex items-stretch">
                 <input
                   type="text"
                   placeholder="Search products..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full rounded-l px-3 py-1 text-black"
+                  className="w-full min-w-0 rounded-l px-3 py-2 text-black focus:outline-none"
+                  autoComplete="off"
+                  aria-label="Search products"
                 />
                 <button
-                  className="bg-yellow-400 text-black px-4 rounded-r"
+                  className="bg-yellow-400 text-black px-4 py-2 rounded-r flex-none"
                   onClick={() => { setPage(0); fetchProducts({ q: search, p: 0, s: size, sortBy: sort }); }}
+                  aria-label="Search"
                 >
                   Search
                 </button>
               </div>
             </div>
 
-            <div className="flex-none flex items-center gap-3">
+            {/* Right controls: Cart */}
+            <div className="flex-none flex items-center gap-2">
+              <button
+                className="bg-white text-blue-600 px-3 py-2 rounded flex items-center gap-2"
+                onClick={() => setIsCartOpen(true)}
+                aria-label="Open cart"
+              >
+                <span className="hidden sm:inline">Cart</span>
+                <span>🛒</span>
+                <span className="ml-1">({totalItems})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ROW 2: Auth row (separate row below) */}
+          <div className="mt-3 bg-blue-500 rounded px-3 py-3">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center sm:justify-end gap-3">
+              {/* On mobile the inputs stack (column). On sm+ they are inline and right-aligned. */}
               {!isLoggedIn ? (
-                <>
+                <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    ref={usernameRef}
+                    placeholder="Username"
+                    className="w-full sm:w-40 border border-transparent rounded px-3 py-2 text-black"
+                    autoComplete="username"
+                  />
+                  <input
+                    ref={passwordRef}
+                    type="password"
+                    placeholder="Password"
+                    className="w-full sm:w-40 border border-transparent rounded px-3 py-2 text-black"
+                    autoComplete="current-password"
+                  />
                   <div className="flex items-center gap-2">
-                    <input ref={usernameRef} placeholder="Username" className="text-black px-2 py-1 rounded" />
-                    <input ref={passwordRef} type="password" placeholder="Password" className="text-black px-2 py-1 rounded" />
-                    <button onClick={login} className="bg-white text-blue-600 px-3 py-1 rounded">Login</button>
+                    <button
+                      onClick={login}
+                      className="bg-white text-blue-600 px-3 py-2 rounded"
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={() => setShowSignup(true)}
+                      className="bg-green-500 text-white px-3 py-2 rounded"
+                    >
+                      Sign Up
+                    </button>
                   </div>
-                  <button onClick={() => setShowSignup(true)} className="bg-green-500 text-white px-3 py-1 rounded">Sign Up</button>
-                </>
+                </div>
               ) : (
-                <>
-                  <span className="hidden sm:inline">Hello, <b>{usernameDisplay}</b></span>
-                  <button onClick={logout} className="bg-white text-red-600 px-3 py-1 rounded">Logout</button>
-                </>
-              )}
-
-              <button className="bg-white text-blue-600 px-4 py-1 rounded ml-2" onClick={() => setIsCartOpen(true)}>
-                Cart 🛒({totalItems})
-              </button>
-            </div>
-          </div>
-
-          {/* ROW 2: Categories */}
-          {/* ROW 2: FULL-WIDTH Categories (replace existing ROW 2) */}
-          {/* this block sits directly under the top inner container inside <header> */}
-          <div className="w-full bg-blue-500"> {/* full width background */}
-            <div className="max-w-7xl mx-auto px-4 py-2">
-              <div
-                className="grid gap-3"
-                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}
-              >
-                {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks', 'Home', 'Toys', 'Beauty'].map(c => (
+                <div className="w-full sm:w-auto flex items-center gap-3 justify-end">
+                  <span className="text-white">Hello, <b>{usernameDisplay}</b></span>
+                  <button onClick={logout} className="bg-white text-red-600 px-3 py-2 rounded">Logout</button>
                   <button
-                    key={c}
-                    className="px-3 py-2 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap min-w-[120px]"
-                    onClick={() => { setSearch(c); setPage(0); fetchProducts({ q: c, p: 0, s: size, sortBy: sort }); }}
+                    className="bg-white text-blue-600 px-3 py-2 rounded"
+                    onClick={() => setIsCartOpen(true)}
                   >
-                    {c}
+                    Cart 🛒({totalItems})
                   </button>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
-
-          {/* ROW 3: Filters / pagination */}
-          <div className="mt-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <label className="text-white text-sm hidden sm:inline">Show</label>
-              <select value={size} onChange={e => { setSize(Number(e.target.value)); setPage(0); }} className="text-black px-2 py-1 rounded">
-                <option value={8}>8</option>
-                <option value={12}>12</option>
-                <option value={20}>20</option>
-                <option value={48}>48</option>
-              </select>
-
-              <label className="text-white text-sm hidden sm:inline">Sort</label>
-              <select value={sort} onChange={e => { setSort(e.target.value); setPage(0); }} className="text-black px-2 py-1 rounded">
-                <option value="name,asc">Name ↑</option>
-                <option value="name,desc">Name ↓</option>
-                <option value="price,asc">Price ↑</option>
-                <option value="price,desc">Price ↓</option>
-                <option value="id,desc">Newest</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                disabled={page <= 0 || loadingProducts}
-                onClick={() => setPage(Math.max(0, page - 1))}
-                className="px-2 py-1 bg-white text-blue-600 rounded disabled:opacity-50"
-              >
-                Prev
-              </button>
-              <span className="text-white text-sm">Page {Number(page) + 1} / {Math.max(1, totalPages)}</span>
-              <button
-                disabled={page + 1 >= totalPages || loadingProducts}
-                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                className="px-2 py-1 bg-white text-blue-600 rounded disabled:opacity-50"
-              >
-                Next
-              </button>
+        {/* ROW: Categories (unchanged) */}
+        <div className="w-full bg-blue-500">
+          <div className="max-w-7xl mx-auto px-4 py-2">
+            <div
+              className="grid gap-3"
+              style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}
+            >
+              {['Electronics', 'Clothing', 'Grocery', 'Stationery', 'Drinks', 'Home', 'Toys', 'Beauty'].map(c => (
+                <button
+                  key={c}
+                  className="px-3 py-2 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap min-w-[120px]"
+                  onClick={() => { setSearch(c); setPage(0); fetchProducts({ q: c, p: 0, s: size, sortBy: sort }); }}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </header>
+      {/* --- END REPLACEMENT HEADER --- */}
 
       {/* MAIN GRID */}
       <main className="max-w-7xl mx-auto px-4 py-6">
