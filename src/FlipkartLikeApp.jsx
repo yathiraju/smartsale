@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { api, getToken, setToken, setUser, getSession } from './services/api';
+import { api, getToken, setToken, setUser, getSession,getApiHost } from './services/api';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import './App.css';
@@ -98,7 +98,7 @@ export default function FlipkartLikeApp() {
   // Helper: base axios instance for host (stable)
   // ----------------------------
   const getHttp = useCallback(() => {
-    const host = api.getApiHost?.() || 'http://localhost:8080';
+    const host = (typeof getApiHost === 'function' ? getApiHost() : null) || 'http://localhost:8080';
     return axios.create({ baseURL: host, timeout: 30000 });
   }, []);
 
