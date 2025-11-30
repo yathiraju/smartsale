@@ -34,6 +34,28 @@ export default function FlipkartLikeApp() {
     pincode: '', country: 'IN', lat: '', lng: ''
   });
 
+  // guest address (when user is NOT logged in and clicks Buy Now)
+    const [guestAddrModalOpen, setGuestAddrModalOpen] = useState(false);
+    const [guestAddress, setGuestAddress] = useState({
+      name: '', phone: '', addressLine1: '', addressLine2: '',
+      city: '', state: '', pincode: '', country: 'IN'
+    });
+    const [guestAddrSubmitting, setGuestAddrSubmitting] = useState(false);
+
+  // ---------- NEW state: full manual address for logged-in user ----------
+  const [manualAddrFull, setManualAddrFull] = useState({
+    name: '',
+    phone: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'IN'
+  });
+  const [manualAddrSubmitting, setManualAddrSubmitting] = useState(false);
+  // ---------- end NEW state ----------
+
   // NEW: address & shipping state
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -42,7 +64,7 @@ export default function FlipkartLikeApp() {
   // address modal UI
   const [addrModalOpen, setAddrModalOpen] = useState(false);
   const [addrChoices, setAddrChoices] = useState([]);
-  const [manualAddr, setManualAddr] = useState({ line1: '', pincode: '' });
+
   const [addrLoading, setAddrLoading] = useState(false);
 
   // ----------------------------
@@ -352,6 +374,39 @@ export default function FlipkartLikeApp() {
     });
   }
 
+  // ---------- add helper to normalize delivery address for capture ----------
+  function buildDeliveryAddressForCapture() {
+    // prefer selectedAddress (chosen from saved/manual), fallback to guestAddress
+    const src = selectedAddress || guestAddress || null;
+    if (!src) return null;
+
+    // Map fields to the backend AddressDto shape:
+    // AddressDto(
+    //   name, phone, addressLine1, addressLine2, city, state, pincode, country
+    // )
+    const name = src.name || src.line1 || usernameDisplay || '';
+    const phone = src.phone || src.mobile || ''; // try different keys just in case
+    const addressLine1 = src.line1 || src.addressLine1 || src.address1 || '';
+    const addressLine2 = src.line2 || src.addressLine2 || src.address2 || '';
+    const city = src.city || '';
+    const state = src.state || '';
+    const pincode = String(src.pincode || src.postalCode || src.zip || '').trim();
+    const country = src.country || 'IN';
+
+    return {
+      name,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      pincode,
+      country
+    };
+  }
+  // ---------- end helper ----------
+
+  // ---------- replaced pay() with capture including deliveryAddress ----------
   async function pay() {
     if (paying) return;
     setPaying(true);
@@ -397,8 +452,29 @@ export default function FlipkartLikeApp() {
         description: 'Order ' + appId,
         handler: async (response) => {
           try {
-            const body = { ...response, orderId: appId, cartId };
+            // response contains razorpay_order_id, razorpay_payment_id, razorpay_signature, etc.
+            // Build the capture payload expected by your backend CaptureDTO:
+            // { body: { ... }, deliveryAddress: { name, phone, addressLine1, ... } }
+
+            const deliveryAddress = buildDeliveryAddressForCapture();
+
+            const body = {
+              // map provider response fields to the 'body' map
+              body: {
+                razorpay_order_id: response?.razorpay_order_id || '',
+                razorpay_payment_id: response?.razorpay_payment_id || '',
+                razorpay_signature: response?.razorpay_signature || '',
+                orderId: String(appId || ''),
+                cartId: String(cartId || '')
+              },
+              // include the normalized delivery address (or null)
+              deliveryAddress
+            };
+
+            // call backend capture endpoint — backend will verify signature and persist order + address
             const cap = await api.capturePayment(body);
+
+            // your backend currently inspects providerOrderId/paymentId and calls paymentService.markSuccess(...)
             if (cap && String(cap.status).toLowerCase() === 'paid') {
               alert('Order Placed successful');
               clearCart();
@@ -427,6 +503,8 @@ export default function FlipkartLikeApp() {
       setPaying(false);
     }
   }
+  // ---------- end pay() ----------
+
 
   // ----------------------------
   // Utilities
@@ -435,74 +513,184 @@ export default function FlipkartLikeApp() {
     return /^[1-9][0-9]{5}$/.test(String(pin || '').trim());
   }
 
-  // ----------------------------
-  // BUY NOW & ADDRESS FLOW (axios)
-  // ----------------------------
+  function isValidPhone(phone) {
+      return /^\d{10}$/.test(String(phone || '').trim());
+    }
+
+  async function submitGuestAddress(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (guestAddrSubmitting) return;
+
+      // validation (mirror AddressDto constraints)
+      const { name, phone, addressLine1, city, state, pincode, country } = guestAddress;
+      if (!String(name || '').trim()) return alert('Name is required');
+      if (!isValidPhone(phone)) return alert('Phone must be a 10-digit number');
+      if (!String(addressLine1 || '').trim()) return alert('Address line1 is required');
+      if (!String(city || '').trim()) return alert('City is required');
+      if (!String(state || '').trim()) return alert('State is required');
+      if (!isValidPincode(pincode)) return alert('Pincode must be a 6-digit number');
+      if (!String(country || '').trim()) return alert('Country is required');
+
+      setGuestAddrSubmitting(true);
+
+      try {
+        // normalize to the shape expected by onAddressChosen (it reads pincode and line1)
+        const addr = {
+          name: guestAddress.name,
+          phone: guestAddress.phone,
+          line1: guestAddress.addressLine1,
+          line2: guestAddress.addressLine2,
+          city: guestAddress.city,
+          state: guestAddress.state,
+          pincode: guestAddress.pincode,
+          country: guestAddress.country
+        };
+
+        // Save guest address in its own state variable (user requested)
+        setGuestAddress(addr);
+
+        // Close modal and reuse existing flow: call onAddressChosen to perform shipping check + continue
+        setGuestAddrModalOpen(false);
+
+        // call same logic that handles shipping (onAddressChosen does shipping check and opens cart)
+        await onAddressChosen(addr);
+
+      } catch (err) {
+        console.error('Guest address submit failed', err);
+        alert('Failed to check shipping for this address. Please try again.');
+      } finally {
+        setGuestAddrSubmitting(false);
+      }
+    }
+
+
   async function handleBuyNow() {
-    if (!isLoggedIn) {
-      alert('Please sign in to buy now.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setAddrLoading(true);
-
-    // cancel previous addr request
-    if (addrCtrlRef.current) {
-      try { addrCtrlRef.current.abort(); } catch (_) {}
-    }
-    const ctrl = new AbortController();
-    addrCtrlRef.current = ctrl;
-    const http = getHttp();
-
-    try {
-      const username = localStorage.getItem('rzp_username') || usernameDisplay;
-      if (!username) {
-        alert('Username not found. Please log in again.');
-        setIsLoggedIn(false);
+      // if not logged in -> open guest address modal to collect AddressDto-like info
+      if (!isLoggedIn) {
+        // show the guest address modal
+        setGuestAddrModalOpen(true);
+        // scroll to top so modal is visible on small screens
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      const res = await http.get(`/api/user/address/${encodeURIComponent(username)}`, { signal: ctrl.signal });
-      const resp = res.data;
+      // existing logic (when logged in) - unchanged
+      setAddrLoading(true);
 
-      if (Array.isArray(resp) && resp.length > 0) {
-        const hasValid = resp.some(a => isValidPincode(a?.pincode));
-        if (!hasValid) {
-          setAddrChoices([]);
-          setManualAddr({ line1: '', pincode: '' });
-          setAddrModalOpen(true);
+      if (addrCtrlRef.current) {
+        try { addrCtrlRef.current.abort(); } catch (_) {}
+      }
+      const ctrl = new AbortController();
+      addrCtrlRef.current = ctrl;
+      const http = getHttp();
+
+      try {
+        const username = localStorage.getItem('rzp_username') || usernameDisplay;
+        if (!username) {
+          alert('Username not found. Please log in again.');
+          setIsLoggedIn(false);
+          return;
+        }
+
+        const res = await http.get(`/api/user/address/${encodeURIComponent(username)}`, { signal: ctrl.signal });
+        const resp = res.data;
+
+        if (Array.isArray(resp) && resp.length > 0) {
+          const hasValid = resp.some(a => isValidPincode(a?.pincode));
+          if (!hasValid) {
+            setAddrChoices([]);
+            setManualAddrFull({
+              name: usernameDisplay || '',
+              phone: '',
+              addressLine1: '',
+              addressLine2: '',
+              city: '',
+              state: '',
+              pincode: '',
+              country: 'IN'
+            });
+            setAddrModalOpen(true);
+          } else {
+            setAddrChoices(resp);
+            setAddrModalOpen(true);
+          }
         } else {
-          setAddrChoices(resp);
+          setAddrChoices([]);
+          setManualAddrFull({
+            name: usernameDisplay || '',
+            phone: '',
+            addressLine1: '',
+            addressLine2: '',
+            city: '',
+            state: '',
+            pincode: '',
+            country: 'IN'
+          });
           setAddrModalOpen(true);
         }
-      } else {
-        setAddrChoices([]);
-        setManualAddr({ line1: '', pincode: '' });
-        setAddrModalOpen(true);
+      } catch (err) {
+        const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
+        if (!isCanceled) {
+          console.error('Fetch addresses failed', err);
+          alert('Failed to fetch addresses. Please enter address manually.');
+          setAddrChoices([]);
+         // setManualAddr({ line1: '', pincode: '' });
+          setAddrModalOpen(true);
+        }
+      } finally {
+        setAddrLoading(false);
+        addrCtrlRef.current = null;
       }
-    } catch (err) {
-      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
-      if (!isCanceled) {
-        console.error('Fetch addresses failed', err);
-        alert('Failed to fetch addresses. Please enter address manually.');
-        setAddrChoices([]);
-        setManualAddr({ line1: '', pincode: '' });
-        setAddrModalOpen(true);
-      }
-    } finally {
-      setAddrLoading(false);
-      addrCtrlRef.current = null;
     }
-  }
 
+// ---------- NEW: submit manual address for logged-in users ----------
+async function submitManualAddrForLoggedIn(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (manualAddrSubmitting) return;
+
+  // mirror same validations as guest
+  const { name, phone, addressLine1, city, state, pincode, country } = manualAddrFull;
+  if (!String(name || '').trim()) return alert('Name is required');
+  if (!isValidPhone(phone)) return alert('Phone must be a 10-digit number');
+  if (!String(addressLine1 || '').trim()) return alert('Address line1 is required');
+  if (!String(city || '').trim()) return alert('City is required');
+  if (!String(state || '').trim()) return alert('State is required');
+  if (!isValidPincode(pincode)) return alert('Pincode must be a 6-digit number');
+  if (!String(country || '').trim()) return alert('Country is required');
+
+  setManualAddrSubmitting(true);
+  try {
+    const addr = {
+      name: manualAddrFull.name,
+      phone: manualAddrFull.phone,
+      line1: manualAddrFull.addressLine1,
+      line2: manualAddrFull.addressLine2,
+      city: manualAddrFull.city,
+      state: manualAddrFull.state,
+      pincode: manualAddrFull.pincode,
+      country: manualAddrFull.country
+    };
+
+    // close modal and use same shipping logic
+    setAddrModalOpen(false);
+
+    // reuse the shipping check / onAddressChosen flow
+    await onAddressChosen(addr);
+  } catch (err) {
+    console.error('submit manual addr failed', err);
+    alert('Failed to check shipping for this address. Please try again.');
+  } finally {
+    setManualAddrSubmitting(false);
+  }
+}
+// ---------- end NEW ----------
 
 
   async function onAddressChosen(addr) {
     const pincode = addr?.pincode || addr?.postalCode || addr?.zip;
     if (!isValidPincode(pincode)) {
       alert('Selected address has invalid/missing pincode. Please enter a valid 6-digit pincode.');
-      setManualAddr({ line1: addr?.line1 || addr?.name || '', pincode: '' });
+      //setManualAddr({ line1: addr?.line1 || addr?.name || '', pincode: '' });
       setAddrChoices([]);
       setAddrModalOpen(true);
       return;
@@ -561,7 +749,7 @@ export default function FlipkartLikeApp() {
       setIsCartOpen(true);
 
       if (fee > 0) {
-        alert(`Delivery fee ₹${fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} added.`);
+        //alert(`Delivery fee ₹${fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} added.`);
       } else {
         alert('Delivery not available. Choose different deliver address.');
       }
@@ -577,13 +765,7 @@ export default function FlipkartLikeApp() {
   }
 
   function chooseAddrFromList(a) { onAddressChosen(a); }
-  function submitManualAddr() {
-    const pin = String(manualAddr.pincode || '').trim();
-    if (!pin) return alert('Please enter delivery pincode');
-    if (!isValidPincode(pin)) return alert('Please enter a valid 6-digit pincode (e.g. 500089)');
-    const addr = { line1: manualAddr.line1 || '', pincode: pin };
-    onAddressChosen(addr);
-  }
+
 
   // ----------------------------
   // Initial fetch on mount
@@ -782,6 +964,32 @@ export default function FlipkartLikeApp() {
         </div>
       )}
 
+        {/* GUEST ADDRESS MODAL (shown when Buy Now clicked and user not logged in) */}
+        {guestAddrModalOpen && (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+            <form onSubmit={submitGuestAddress} className="bg-white p-6 rounded shadow max-w-lg w-full">
+              <h2 className="text-xl font-bold mb-3">Enter delivery address</h2>
+
+              <div className="grid grid-cols-1 gap-2 text-black">
+                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Phone (10 digits)" value={guestAddress.phone} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Address line 1" value={guestAddress.addressLine1} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Address line 2 (optional)" value={guestAddress.addressLine2} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="City" value={guestAddress.city} onChange={e => setGuestAddress(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="State" value={guestAddress.state} onChange={e => setGuestAddress(prev => ({ ...prev, state: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Country" value={guestAddress.country} onChange={e => setGuestAddress(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button type="button" onClick={() => setGuestAddrModalOpen(false)}>Cancel</button>
+                <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded">{guestAddrSubmitting ? 'Checking...' : 'Continue'}</button>
+              </div>
+            </form>
+          </div>
+        )}
+
+
       {/* ADDRESS SELECTION / MANUAL ENTRY MODAL */}
       {addrModalOpen && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
@@ -808,15 +1016,23 @@ export default function FlipkartLikeApp() {
 
             {!addrLoading && (!addrChoices || addrChoices.length === 0) && (
               <div>
-                <div className="text-sm text-gray-600 mb-2">No saved addresses. Enter delivery address (pincode required).</div>
-                <div className="grid grid-cols-1 gap-2">
-                  <input placeholder="Address line 1" value={manualAddr.line1} onChange={e => setManualAddr(prev => ({ ...prev, line1: e.target.value }))} className="border p-2 rounded" />
-                  <input placeholder="Pincode (6 digits)" value={manualAddr.pincode} onChange={e => setManualAddr(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
-                </div>
-                <div className="flex justify-end gap-2 mt-3">
-                  <button onClick={() => setAddrModalOpen(false)} className="px-3 py-1">Cancel</button>
-                  <button onClick={submitManualAddr} className="bg-blue-600 text-white px-3 py-1 rounded">Use this address</button>
-                </div>
+                <div className="text-sm text-gray-600 mb-2">No saved addresses. Enter delivery address.</div>
+
+                <form onSubmit={submitManualAddrForLoggedIn} className="grid grid-cols-1 gap-2">
+                  <input placeholder="Name" value={manualAddrFull.name} onChange={e => setManualAddrFull(prev => ({ ...prev, name: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="Phone (10 digits)" value={manualAddrFull.phone} onChange={e => setManualAddrFull(prev => ({ ...prev, phone: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="Address line 1" value={manualAddrFull.addressLine1} onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="Address line 2 (optional)" value={manualAddrFull.addressLine2} onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="City" value={manualAddrFull.city} onChange={e => setManualAddrFull(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="State" value={manualAddrFull.state} onChange={e => setManualAddrFull(prev => ({ ...prev, state: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="Pincode (6 digits)" value={manualAddrFull.pincode} onChange={e => setManualAddrFull(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                  <input placeholder="Country" value={manualAddrFull.country} onChange={e => setManualAddrFull(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
+
+                  <div className="flex justify-end gap-2 mt-3">
+                    <button type="button" onClick={() => setAddrModalOpen(false)} className="px-3 py-1">Cancel</button>
+                    <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded">{manualAddrSubmitting ? 'Checking...' : 'Use this address'}</button>
+                  </div>
+                </form>
               </div>
             )}
 
