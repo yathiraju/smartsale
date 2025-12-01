@@ -876,12 +876,6 @@ async function submitManualAddrForLoggedIn(e) {
                 <div className="w-full sm:w-auto flex items-center gap-3 justify-end">
                   <span className="text-white">Hello, <b>{usernameDisplay}</b></span>
                   <button onClick={logout} className="bg-white text-red-600 px-3 py-2 rounded">Logout</button>
-                  <button
-                    className="bg-white text-blue-600 px-3 py-2 rounded"
-                    onClick={() => setIsCartOpen(true)}
-                  >
-                    Cart 🛒({totalItems})
-                  </button>
                 </div>
               )}
             </div>
