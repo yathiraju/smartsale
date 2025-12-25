@@ -917,7 +917,7 @@ async function submitManualAddrForLoggedIn(e) {
                       <button
                         onClick={() => {
                           setProfileOpen(false);
-                          alert("Orders Clicked");
+                          navigate('/orders');
                         }}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
                       >
