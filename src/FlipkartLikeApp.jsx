@@ -2,6 +2,7 @@
 // Layout reference image: /mnt/data/layout1.png
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { api, getToken, setToken, setUser, getSession,getApiHost } from './services/api';
 import ProductCard from './components/ProductCard';
@@ -14,6 +15,7 @@ export default function FlipkartLikeApp() {
   // ----------------------------
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   const [cart, setCart] = useState({});
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -25,6 +27,8 @@ export default function FlipkartLikeApp() {
   const passwordRef = useRef(null);
 
   const [paying, setPaying] = useState(false);
+
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [showSignup, setShowSignup] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
@@ -838,48 +842,114 @@ async function submitManualAddrForLoggedIn(e) {
             </div>
           </div>
 
-          {/* ROW 2: Auth row (separate row below) */}
-          <div className="mt-3 bg-blue-500 rounded px-3 py-3">
-            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center sm:justify-end gap-3">
-              {/* On mobile the inputs stack (column). On sm+ they are inline and right-aligned. */}
-              {!isLoggedIn ? (
-                <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <input
-                    ref={usernameRef}
-                    placeholder="Username"
-                    className="w-full sm:w-40 border border-transparent rounded px-3 py-2 text-black"
-                    autoComplete="username"
-                  />
-                  <input
-                    ref={passwordRef}
-                    type="password"
-                    placeholder="Password"
-                    className="w-full sm:w-40 border border-transparent rounded px-3 py-2 text-black"
-                    autoComplete="current-password"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={login}
-                      className="bg-white text-blue-600 px-3 py-2 rounded"
-                    >
-                      Login
-                    </button>
-                    <button
-                      onClick={() => setShowSignup(true)}
-                      className="bg-green-500 text-white px-3 py-2 rounded"
-                    >
-                      Sign Up
-                    </button>
-                  </div>
+          {/* ROW 2: Auth row (Flipkart-style login/profile menu) */}
+          <div className="mt-3 bg-blue-500 rounded px-3 py-2">
+            <div className="max-w-7xl mx-auto flex items-center justify-end gap-4 relative">
+
+              {/* ---------- NOT LOGGED IN ---------- */}
+              {!isLoggedIn && (
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate('/login');
+                    }}
+                    className="flex-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+                  >
+                    Login
+                  </button>
+                  {/* Sign Up */}
+                      <button
+                        onClick={() => setShowSignup(true)}
+                        className="bg-yellow-400 text-black px-4 py-2 rounded font-semibold hover:bg-yellow-300 shadow"
+                      >
+                        Sign Up
+                      </button>
+
+                  {profileOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white text-black rounded shadow-lg py-2 z-50">
+                      <div className="px-4 py-2 text-gray-600 text-sm border-b">
+                        New customer?{" "}
+                        <button
+                          onClick={() => {
+                            setShowSignup(true);
+                            setProfileOpen(false);
+                          }}
+                          className="text-blue-600 font-semibold"
+                        >
+                          Sign Up
+                        </button>
+                      </div>
+
+                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                        👤 My Profile
+                      </button>
+
+                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                        🛒 Orders
+                      </button>
+
+                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                        ⭐ Rewards
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="w-full sm:w-auto flex items-center gap-3 justify-end">
-                  <span className="text-white">Hello, <b>{usernameDisplay}</b></span>
-                  <button onClick={logout} className="bg-white text-red-600 px-3 py-2 rounded">Logout</button>
+              )}
+
+              {/* ---------- LOGGED IN ---------- */}
+              {isLoggedIn && (
+                <div className="relative">
+                  <button
+                    onClick={() => setProfileOpen(prev => !prev)}
+                    className="bg-white text-blue-600 px-4 py-2 rounded flex items-center gap-2 shadow"
+                  >
+                    <span>{usernameDisplay}</span>
+                    <span className={`${profileOpen ? "rotate-180" : ""}`}>⌄</span>
+                  </button>
+
+                  {profileOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white text-black rounded shadow-lg py-2 z-50">
+                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                        👤 My Profile
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          alert("Orders Clicked");
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                      >
+                        🛒 Orders
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          alert("Rewards Clicked");
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                      >
+                        ⭐ Rewards
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          logout();
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-gray-100 border-t"
+                      >
+                        🔓 Logout
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
+
         </div>
 
         {/* ROW: Categories (unchanged) */}
