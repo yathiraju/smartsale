@@ -36,7 +36,7 @@ export default function OrdersPage() {
   function isRefundAllowed(createdAt) {
     const createdTime = new Date(createdAt).getTime();
     const diffHours = (Date.now() - createdTime) / (1000 * 60 * 60);
-    return diffHours <= 24;
+    return diffHours <= 48;
   }
 
   async function refundOrder(orderId) {

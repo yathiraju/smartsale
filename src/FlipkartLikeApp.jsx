@@ -904,7 +904,7 @@ async function submitManualAddrForLoggedIn(e) {
                     onClick={() => setProfileOpen(prev => !prev)}
                     className="bg-white text-blue-600 px-4 py-2 rounded flex items-center gap-2 shadow"
                   >
-                    <span>{usernameDisplay}</span>
+                    <span className="text-xl">👤</span>
                     <span className={`${profileOpen ? "rotate-180" : ""}`}>⌄</span>
                   </button>
 
