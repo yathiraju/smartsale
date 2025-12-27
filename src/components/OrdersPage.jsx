@@ -5,14 +5,14 @@ import { getApiHost } from '../services/api';
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey,setRefreshKey] = useState(0);
 
   const username = localStorage.getItem('rzp_username');
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
+  // 🔁 Load orders
+useEffect(() => {
   async function fetchOrders() {
+    setLoading(true);
     try {
       const http = axios.create({
         baseURL: getApiHost(),
@@ -20,8 +20,8 @@ export default function OrdersPage() {
       });
 
       const res = await http.post('/api/orders/byUser', {
-            username: username
-          });
+        username: username
+      });
 
       setOrders(res.data || []);
     } catch (e) {
@@ -32,23 +32,28 @@ export default function OrdersPage() {
     }
   }
 
-  // ✅ Refund allowed within 24 hours
+  fetchOrders();
+}, [username, refreshKey]);
+
+
+  // ✅ Refund allowed within 48 hours
   function isRefundAllowed(createdAt) {
     const createdTime = new Date(createdAt).getTime();
     const diffHours = (Date.now() - createdTime) / (1000 * 60 * 60);
     return diffHours <= 48;
   }
 
+  // 💸 Refund flow
   async function refundOrder(order) {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
+
     const http = axios.create({
       baseURL: getApiHost().replace(/\/+$/, ''),
       headers: { 'Content-Type': 'application/json' }
     });
 
-
     try {
-      // 1️⃣ Get shipment IDs for order
+      // 1️⃣ Get shipment IDs
       const shipmentRes = await http.post(
         `/api/shipping/shipment/ids/${order.id}`
       );
@@ -61,15 +66,12 @@ export default function OrdersPage() {
       }
 
       // 2️⃣ Cancel shipments
-      await http.post(
-        '/api/shipping/shipment/cancel',
-        shipmentIds
-      );
+      await http.post('/api/shipping/shipment/cancel', shipmentIds);
 
-      // 3️⃣ Create Razorpay refund
+      // 3️⃣ Razorpay refund
       await http.post('/api/refunds', {
-        paymentId: order.paymentRef,          // ✔ mapped
-        amount: Math.round(order.grandTotal * 100), // ✔ paise
+        paymentId: order.paymentRef,
+        amount: Math.round(order.grandTotal * 100),
         speed: 'optimum',
         receipt: null,
         notes: {
@@ -78,13 +80,13 @@ export default function OrdersPage() {
         }
       });
 
-      // 4️⃣ Cancel order (existing API)
-      await http.post(
-        `/api/orders/cancel/${order.id}?restock=true`
-      );
+      // 4️⃣ Cancel order
+      await http.post(`/api/orders/cancel/${order.id}?restock=true`);
 
       alert('Order refunded and cancelled successfully');
-      fetchOrders();
+
+      // 🔄 Refresh orders
+      setRefreshKey(prev => prev + 1);
 
     } catch (err) {
       console.error(err);
@@ -95,7 +97,7 @@ export default function OrdersPage() {
     }
   }
 
-
+  // ⏳ Loading state
   if (loading) {
     return <div className="p-6">Loading orders...</div>;
   }
@@ -110,8 +112,10 @@ export default function OrdersPage() {
 
       <div className="space-y-6">
         {orders.map(order => (
-          <div key={order.id} className="border rounded-lg shadow-sm p-5 bg-white">
-
+          <div
+            key={order.id}
+            className="border rounded-lg shadow-sm p-5 bg-white"
+          >
             {/* HEADER */}
             <div className="flex flex-wrap justify-between gap-4">
               <div>
@@ -122,7 +126,8 @@ export default function OrdersPage() {
                   Placed on {new Date(order.createdAt).toLocaleString()}
                 </div>
                 <div className="text-sm">
-                  Status: <span className="font-semibold">{order.status}</span>
+                  Status:{' '}
+                  <span className="font-semibold">{order.status}</span>
                 </div>
               </div>
 
@@ -158,9 +163,7 @@ export default function OrdersPage() {
                   </div>
 
                   <div className="text-right">
-                    <div>
-                      ₹{item.product.salePrice} × {item.quantity}
-                    </div>
+                    ₹{item.product.salePrice} × {item.quantity}
                   </div>
                 </div>
               ))}
@@ -182,7 +185,8 @@ export default function OrdersPage() {
 
             {/* ACTIONS */}
             <div className="mt-4 flex justify-end">
-              {order.status === 'CONFIRMED' && isRefundAllowed(order.createdAt) ? (
+              {order.status === 'CONFIRMED' &&
+              isRefundAllowed(order.createdAt) ? (
                 <button
                   onClick={() => refundOrder(order)}
                   className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
@@ -198,7 +202,6 @@ export default function OrdersPage() {
                 </button>
               )}
             </div>
-
           </div>
         ))}
       </div>

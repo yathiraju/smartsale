@@ -24,7 +24,7 @@ export default function FlipkartLikeApp() {
   const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
 
   const usernameRef = useRef(null);
-  const passwordRef = useRef(null);
+
 
   const [paying, setPaying] = useState(false);
 
@@ -178,29 +178,7 @@ export default function FlipkartLikeApp() {
     fetchProducts({ q: search, p: page, s: size, sortBy: sort });
   }, [page, size, sort, fetchProducts, search]);
 
-  // ----------------------------
-  // LOGIN / LOGOUT
-  // ----------------------------
-  async function login() {
-    const userName = String(usernameRef.current?.value || '').trim();
-    const pwd = String(passwordRef.current?.value || '').trim();
-    if (!userName || !pwd) return alert('Enter username and password');
 
-    try {
-      const res = await api.login(userName, pwd);
-      if (res && res.token) {
-        setToken(res.token);
-        setUser(userName);
-        localStorage.setItem('rzp_username', userName);
-        setUsernameDisplay(userName);
-        setIsLoggedIn(true);
-        fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
-      } else throw new Error('No token');
-    } catch (e) {
-      console.error(e);
-      alert('Login failed');
-    }
-  }
 
   function logout() {
     setToken(null);
