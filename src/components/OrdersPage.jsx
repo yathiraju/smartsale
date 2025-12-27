@@ -39,19 +39,62 @@ export default function OrdersPage() {
     return diffHours <= 48;
   }
 
-  async function refundOrder(orderId) {
-    if (!window.confirm('Are you sure you want to Cancel this order?')) return;
+  async function refundOrder(order) {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    const http = axios.create({
+      baseURL: getApiHost().replace(/\/+$/, ''),
+      headers: { 'Content-Type': 'application/json' }
+    });
+
 
     try {
-      const http = axios.create({ baseURL: getApiHost() });
-      await http.post(`/api/orders/cancel/${orderId}?restock=true`);
-      alert('Order refunded successfully');
+      // 1️⃣ Get shipment IDs for order
+      const shipmentRes = await http.post(
+        `/api/shipping/shipment/ids/${order.id}`
+      );
+
+      const shipmentIds = shipmentRes.data;
+
+      if (!Array.isArray(shipmentIds) || shipmentIds.length === 0) {
+        alert('No shipments found for this order');
+        return;
+      }
+
+      // 2️⃣ Cancel shipments
+      await http.post(
+        '/api/shipping/shipment/cancel',
+        shipmentIds
+      );
+
+      // 3️⃣ Create Razorpay refund
+      await http.post('/api/refunds', {
+        paymentId: order.paymentRef,          // ✔ mapped
+        amount: Math.round(order.grandTotal * 100), // ✔ paise
+        speed: 'optimum',
+        receipt: null,
+        notes: {
+          reason: 'Customer cancelled',
+          orderId: String(order.id)
+        }
+      });
+
+      // 4️⃣ Cancel order (existing API)
+      await http.post(
+        `/api/orders/cancel/${order.id}?restock=true`
+      );
+
+      alert('Order refunded and cancelled successfully');
       fetchOrders();
-    } catch (e) {
-      console.error(e);
-      alert('Refund failed');
+
+    } catch (err) {
+      console.error(err);
+      alert(
+        err?.response?.data?.message ||
+        'Refund process failed. Please contact support.'
+      );
     }
   }
+
 
   if (loading) {
     return <div className="p-6">Loading orders...</div>;
@@ -141,7 +184,7 @@ export default function OrdersPage() {
             <div className="mt-4 flex justify-end">
               {order.status === 'CONFIRMED' && isRefundAllowed(order.createdAt) ? (
                 <button
-                  onClick={() => refundOrder(order.id)}
+                  onClick={() => refundOrder(order)}
                   className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
                 >
                   Refund
