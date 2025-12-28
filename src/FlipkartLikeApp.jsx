@@ -816,7 +816,7 @@ async function submitManualAddrForLoggedIn(e) {
               <div className="flex items-stretch">
                 <input
                   type="text"
-                  placeholder="Search products..."
+                  placeholder="Search smartsales.in"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="w-full min-w-0 rounded-l px-3 py-2 text-black focus:outline-none"
@@ -828,7 +828,7 @@ async function submitManualAddrForLoggedIn(e) {
                   onClick={() => { setPage(0); fetchProducts({ q: search, p: 0, s: size, sortBy: sort }); }}
                   aria-label="Search"
                 >
-                  Search
+                  🔍
                 </button>
               </div>
             </div>
