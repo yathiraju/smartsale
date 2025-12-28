@@ -8,7 +8,7 @@ import { api, getToken, setToken, setUser, getSession,getApiHost } from './servi
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import './App.css';
-
+import IndiaStateSelect from "./components/IndiaStateSelect";
 export default function FlipkartLikeApp() {
   // ----------------------------
   // STATES
@@ -87,6 +87,11 @@ export default function FlipkartLikeApp() {
   const addrCtrlRef = useRef(null);
   const shippingCtrlRef = useRef(null);
 
+  // validations - utilities
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidPhone = (phone) => /^\d{10}$/.test(phone);
+  const isValidName = (name) => /^[A-Za-z\s]+$/.test(name);
+ const isValidPincode = (pin) =>  /^[1-9][0-9]{5}$/.test(pin);
   // ----------------------------
   // image URL helper (stable)
   // ----------------------------
@@ -197,10 +202,44 @@ export default function FlipkartLikeApp() {
   async function signupSubmit(e) {
     e.preventDefault();
     if (signupLoading) return;
-    if (!signupData.username || !signupData.email || !signupData.password)
-      return alert('Provide username, email, password');
+    const {
+        username,
+        email,
+        password,
+        name,
+        phone,
+        line1,
+        city,
+        state,
+        pincode
+      } = signupData;
 
-    setSignupLoading(true);
+      // 🔴 Mandatory checks
+      if (!username.trim()) return alert("Username is required");
+      if (!email.trim()) return alert("Email is required");
+      if (!password.trim()) return alert("Password is required");
+      if (!name.trim()) return alert("Name is required");
+      if (!phone.trim()) return alert("Phone is required");
+      if (!line1.trim()) return alert("Address Line 1 is required");
+      if (!city.trim()) return alert("City is required");
+      if (!state.trim()) return alert("State is required");
+      if (!pincode.trim()) return alert("Pincode is required");
+
+      // 🔴 Format validations
+      if (!isValidEmail(email))
+        return alert("Please enter a valid email address");
+
+      if (!isValidPhone(phone))
+        return alert("Phone number must be exactly 10 digits");
+
+      if (!isValidName(name))
+        return alert("Name should contain only letters");
+
+      if (!isValidPincode(pincode))
+        return alert("Pincode must be a valid 6-digit number");
+
+      // ✅ Passed all validations — continue signup
+      setSignupLoading(true);
 
     // cancel previous signup call if any
     if (signupCtrlRef.current) {
@@ -485,19 +524,7 @@ export default function FlipkartLikeApp() {
       setPaying(false);
     }
   }
-  // ---------- end pay() ----------
-
-
-  // ----------------------------
-  // Utilities
-  // ----------------------------
-  function isValidPincode(pin) {
-    return /^[1-9][0-9]{5}$/.test(String(pin || '').trim());
-  }
-
-  function isValidPhone(phone) {
-      return /^\d{10}$/.test(String(phone || '').trim());
-    }
+  // ---------- end pay() ------
 
   async function submitGuestAddress(e) {
       if (e && e.preventDefault) e.preventDefault();
@@ -1048,10 +1075,76 @@ async function submitManualAddrForLoggedIn(e) {
           <form onSubmit={signupSubmit} className="bg-white p-6 rounded shadow max-w-xl w-full">
             <h2 className="text-xl font-bold mb-4">Create Account</h2>
             <div className="grid grid-cols-2 gap-3 text-black">
-              {Object.keys(signupData).map(k => (
-                <input key={k} placeholder={k} value={signupData[k]} onChange={(e) => signupFieldChange(k, e.target.value)} className="border p-2 rounded" />
-              ))}
+
+              <input placeholder="Username" value={signupData.username}
+                onChange={e => signupFieldChange("username", e.target.value)}
+                className="border p-2 rounded" />
+
+              <input placeholder="Email" value={signupData.email}
+                onChange={e => signupFieldChange("email", e.target.value)}
+                className="border p-2 rounded" />
+
+              <input type="password" placeholder="Password" value={signupData.password}
+                onChange={e => signupFieldChange("password", e.target.value)}
+                className="border p-2 rounded" />
+
+              <input placeholder="Name" value={signupData.name}
+                onChange={e =>
+                    signupFieldChange(
+                      "name",
+                      e.target.value.replace(/[^A-Za-z\s]/g, "")
+                    )
+                  }
+                className="border p-2 rounded" />
+
+              <input
+                placeholder="Phone"
+                value={signupData.phone}
+                maxLength={10}
+                onChange={e =>
+                  signupFieldChange(
+                    "phone",
+                    e.target.value.replace(/\D/g, "")
+                  )
+                }
+                className="border p-2 rounded"
+              />
+
+              <input placeholder="Address Line 1" value={signupData.line1}
+                onChange={e => signupFieldChange("line1", e.target.value)}
+                className="border p-2 rounded" />
+
+              <input placeholder="Address Line 2" value={signupData.line2}
+                onChange={e => signupFieldChange("line2", e.target.value)}
+                className="border p-2 rounded" />
+
+              <input placeholder="City" value={signupData.city}
+                onChange={e => signupFieldChange("city", e.target.value)}
+                className="border p-2 rounded" />
+
+              {/* ✅ STATE DROPDOWN */}
+              <div className="col-span-2">
+                <IndiaStateSelect
+                  value={signupData.state}
+                  onChange={(state) => signupFieldChange("state", state)}
+                />
+              </div>
+
+              <input
+                placeholder="Pincode"
+                value={signupData.pincode}
+                maxLength={6}
+                onChange={e =>
+                  signupFieldChange(
+                    "pincode",
+                    e.target.value.replace(/\D/g, "")
+                  )
+                }
+                className="border p-2 rounded"
+              />
+
             </div>
+
             <div className="flex justify-end gap-3 mt-4">
               <button type="button" onClick={() => setShowSignup(false)}>Cancel</button>
               <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded">{signupLoading ? '...' : 'Sign Up'}</button>
@@ -1067,13 +1160,18 @@ async function submitManualAddrForLoggedIn(e) {
               <h2 className="text-xl font-bold mb-3">Enter delivery address</h2>
 
               <div className="grid grid-cols-1 gap-2 text-black">
-                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value }))} className="border p-2 rounded" />
-                <input placeholder="Phone (10 digits)" value={guestAddress.phone} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z\s]/g, "") }))} className="border p-2 rounded" />
+                <input placeholder="Phone (10 digits)" value={guestAddress.phone} maxLength={10} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, "") }))} className="border p-2 rounded" />
                 <input placeholder="Address line 1" value={guestAddress.addressLine1} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
                 <input placeholder="Address line 2 (optional)" value={guestAddress.addressLine2} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
                 <input placeholder="City" value={guestAddress.city} onChange={e => setGuestAddress(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
-                <input placeholder="State" value={guestAddress.state} onChange={e => setGuestAddress(prev => ({ ...prev, state: e.target.value }))} className="border p-2 rounded" />
-                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                                <div className="w-full"><IndiaStateSelect
+                                  value={guestAddress.state}
+                                  onChange={(state) =>
+                                    setGuestAddress(prev => ({ ...prev, state }))
+                                  }
+                                /></div>
+                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} maxLength={6} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value.replace(/\D/g, "") }))} className="border p-2 rounded" />
                 <input placeholder="Country" value={guestAddress.country} onChange={e => setGuestAddress(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
               </div>
 
@@ -1120,7 +1218,12 @@ async function submitManualAddrForLoggedIn(e) {
                   <input placeholder="Address line 1" value={manualAddrFull.addressLine1} onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
                   <input placeholder="Address line 2 (optional)" value={manualAddrFull.addressLine2} onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
                   <input placeholder="City" value={manualAddrFull.city} onChange={e => setManualAddrFull(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
-                  <input placeholder="State" value={manualAddrFull.state} onChange={e => setManualAddrFull(prev => ({ ...prev, state: e.target.value }))} className="border p-2 rounded" />
+                                    <div className="w-full"><IndiaStateSelect
+                                      value={manualAddrFull.state}
+                                      onChange={(state) =>
+                                        setManualAddrFull(prev => ({ ...prev, state }))
+                                      }
+                                    /></div>
                   <input placeholder="Pincode (6 digits)" value={manualAddrFull.pincode} onChange={e => setManualAddrFull(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
                   <input placeholder="Country" value={manualAddrFull.country} onChange={e => setManualAddrFull(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
 
