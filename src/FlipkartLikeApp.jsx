@@ -1160,8 +1160,8 @@ async function submitManualAddrForLoggedIn(e) {
               <h2 className="text-xl font-bold mb-3">Enter delivery address</h2>
 
               <div className="grid grid-cols-1 gap-2 text-black">
-                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value }))} className="border p-2 rounded" />
-                <input placeholder="Phone (10 digits)" value={guestAddress.phone} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z\s]/g, "") }))} className="border p-2 rounded" />
+                <input placeholder="Phone (10 digits)" value={guestAddress.phone} maxLength={10} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, "") }))} className="border p-2 rounded" />
                 <input placeholder="Address line 1" value={guestAddress.addressLine1} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
                 <input placeholder="Address line 2 (optional)" value={guestAddress.addressLine2} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
                 <input placeholder="City" value={guestAddress.city} onChange={e => setGuestAddress(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
@@ -1171,7 +1171,7 @@ async function submitManualAddrForLoggedIn(e) {
                                     setGuestAddress(prev => ({ ...prev, state }))
                                   }
                                 /></div>
-                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} maxLength={6} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value.replace(/\D/g, "") }))} className="border p-2 rounded" />
                 <input placeholder="Country" value={guestAddress.country} onChange={e => setGuestAddress(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
               </div>
 
