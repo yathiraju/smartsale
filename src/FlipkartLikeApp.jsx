@@ -87,6 +87,11 @@ export default function FlipkartLikeApp() {
   const addrCtrlRef = useRef(null);
   const shippingCtrlRef = useRef(null);
 
+  // validations - utilities
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidPhone = (phone) => /^\d{10}$/.test(phone);
+  const isValidName = (name) => /^[A-Za-z\s]+$/.test(name);
+ const isValidPincode = (pin) =>  /^[1-9][0-9]{5}$/.test(pin);
   // ----------------------------
   // image URL helper (stable)
   // ----------------------------
@@ -197,10 +202,44 @@ export default function FlipkartLikeApp() {
   async function signupSubmit(e) {
     e.preventDefault();
     if (signupLoading) return;
-    if (!signupData.username || !signupData.email || !signupData.password)
-      return alert('Provide username, email, password');
+    const {
+        username,
+        email,
+        password,
+        name,
+        phone,
+        line1,
+        city,
+        state,
+        pincode
+      } = signupData;
 
-    setSignupLoading(true);
+      // 🔴 Mandatory checks
+      if (!username.trim()) return alert("Username is required");
+      if (!email.trim()) return alert("Email is required");
+      if (!password.trim()) return alert("Password is required");
+      if (!name.trim()) return alert("Name is required");
+      if (!phone.trim()) return alert("Phone is required");
+      if (!line1.trim()) return alert("Address Line 1 is required");
+      if (!city.trim()) return alert("City is required");
+      if (!state.trim()) return alert("State is required");
+      if (!pincode.trim()) return alert("Pincode is required");
+
+      // 🔴 Format validations
+      if (!isValidEmail(email))
+        return alert("Please enter a valid email address");
+
+      if (!isValidPhone(phone))
+        return alert("Phone number must be exactly 10 digits");
+
+      if (!isValidName(name))
+        return alert("Name should contain only letters");
+
+      if (!isValidPincode(pincode))
+        return alert("Pincode must be a valid 6-digit number");
+
+      // ✅ Passed all validations — continue signup
+      setSignupLoading(true);
 
     // cancel previous signup call if any
     if (signupCtrlRef.current) {
@@ -485,19 +524,7 @@ export default function FlipkartLikeApp() {
       setPaying(false);
     }
   }
-  // ---------- end pay() ----------
-
-
-  // ----------------------------
-  // Utilities
-  // ----------------------------
-  function isValidPincode(pin) {
-    return /^[1-9][0-9]{5}$/.test(String(pin || '').trim());
-  }
-
-  function isValidPhone(phone) {
-      return /^\d{10}$/.test(String(phone || '').trim());
-    }
+  // ---------- end pay() ------
 
   async function submitGuestAddress(e) {
       if (e && e.preventDefault) e.preventDefault();
@@ -1062,12 +1089,26 @@ async function submitManualAddrForLoggedIn(e) {
                 className="border p-2 rounded" />
 
               <input placeholder="Name" value={signupData.name}
-                onChange={e => signupFieldChange("name", e.target.value)}
+                onChange={e =>
+                    signupFieldChange(
+                      "name",
+                      e.target.value.replace(/[^A-Za-z\s]/g, "")
+                    )
+                  }
                 className="border p-2 rounded" />
 
-              <input placeholder="Phone" value={signupData.phone}
-                onChange={e => signupFieldChange("phone", e.target.value)}
-                className="border p-2 rounded" />
+              <input
+                placeholder="Phone"
+                value={signupData.phone}
+                maxLength={10}
+                onChange={e =>
+                  signupFieldChange(
+                    "phone",
+                    e.target.value.replace(/\D/g, "")
+                  )
+                }
+                className="border p-2 rounded"
+              />
 
               <input placeholder="Address Line 1" value={signupData.line1}
                 onChange={e => signupFieldChange("line1", e.target.value)}
@@ -1089,9 +1130,18 @@ async function submitManualAddrForLoggedIn(e) {
                 />
               </div>
 
-              <input placeholder="Pincode" value={signupData.pincode}
-                onChange={e => signupFieldChange("pincode", e.target.value)}
-                className="border p-2 rounded" />
+              <input
+                placeholder="Pincode"
+                value={signupData.pincode}
+                maxLength={6}
+                onChange={e =>
+                  signupFieldChange(
+                    "pincode",
+                    e.target.value.replace(/\D/g, "")
+                  )
+                }
+                className="border p-2 rounded"
+              />
 
             </div>
 
