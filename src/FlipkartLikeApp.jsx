@@ -801,183 +801,115 @@ async function submitManualAddrForLoggedIn(e) {
         <div className="max-w-7xl mx-auto px-4 py-2">
           {/* ROW 1: Logo | Search | Cart */}
           <div className="flex items-center gap-4">
+
             {/* Logo */}
             <div className="flex-none">
               <img
                 src="/smartsale.png"
                 alt="SmartSale"
-                className="w-12 h-12 sm:w-16 sm:h-16 object-contain"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                className="h-10 w-auto object-contain"
               />
             </div>
 
-            {/* Search (center) */}
-            <div className="flex-1 min-w-0"> {/* min-w-0 is important for proper shrinking */}
-              <div className="flex items-stretch">
-                <input
-                  type="text"
-                  placeholder="Search smartsales.in"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full min-w-0 rounded-l px-3 py-2 text-black focus:outline-none"
-                  autoComplete="off"
-                  aria-label="Search products"
-                />
-                <button
-                  className="bg-yellow-400 text-black px-4 py-2 rounded-r flex-none"
-                  onClick={() => { setPage(0); fetchProducts({ q: search, p: 0, s: size, sortBy: sort }); }}
-                  aria-label="Search"
-                >
-                  🔍
-                </button>
-              </div>
+            {/* Search */}
+            <div className="flex w-full max-w-4xl bg-white rounded shadow-sm border h-10">
+              <select className="bg-gray-100 text-sm px-3 h-10 border-r outline-none">
+                <option value="all">All</option>
+                <option value="electronics">Electronics</option>
+                <option value="grocery">Grocery</option>
+              </select>
+
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search SmartSales.in"
+                className="flex-1 h-10 px-3 text-black outline-none"
+              />
+
+              <button
+                onClick={() => {
+                  setPage(0);
+                  fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
+                }}
+                className="h-10 bg-yellow-400 px-4 flex items-center justify-center hover:bg-yellow-500"
+              >
+                🔍
+              </button>
             </div>
 
-            {/* Right controls: Cart */}
-            <div className="flex-none flex items-center gap-2">
+            {/* NOT LOGGED IN → Login & Sign Up */}
+            {!isLoggedIn && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/login')}
+                  className="h-10 px-4 bg-white text-blue-600 rounded font-semibold hover:bg-gray-100 border"
+                >
+                  Login
+                </button>
+
+                <button
+                  onClick={() => setShowSignup(true)}
+                  className="h-10 px-4 bg-yellow-400 text-black rounded font-semibold hover:bg-yellow-300"
+                >
+                  Sign Up
+                </button>
+              </div>
+            )}
+
+            {/* LOGGED IN → Profile icon */}
+            {isLoggedIn && (
+              <div className="relative">
+                <button
+                  onClick={() => setProfileOpen(prev => !prev)}
+                  className="h-10 px-3 bg-white text-blue-600 rounded flex items-center gap-1 shadow"
+                >
+                  <span className="text-xl">👤</span>
+                  <span className={`${profileOpen ? "rotate-180" : ""}`}>⌄</span>
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded shadow-lg py-2 z-50">
+                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
+                      👤 My Profile
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate('/orders');
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                    >
+                      🛒 Orders
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        logout();
+                      }}
+                      className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 border-t"
+                    >
+                      🔓 Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Cart */}
+            <div className="flex-none">
               <button
-                className="bg-white text-blue-600 px-3 py-2 rounded flex items-center gap-2"
+                className="h-10 bg-white text-blue-600 px-3 rounded flex items-center gap-1"
                 onClick={() => setIsCartOpen(true)}
-                aria-label="Open cart"
               >
-                <span className="hidden sm:inline">Cart</span>
-                <span>🛒</span>
-                <span className="ml-1">({totalItems})</span>
+                🛒 ({totalItems})
               </button>
             </div>
           </div>
-
-          {/* ROW 2: Auth row (Flipkart-style login/profile menu) */}
-          <div className="mt-3 bg-blue-500 rounded px-3 py-2">
-            <div className="max-w-7xl mx-auto flex items-center justify-end gap-4 relative">
-
-              {/* ---------- NOT LOGGED IN ---------- */}
-              {!isLoggedIn && (
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate('/login');
-                    }}
-                    className="flex-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
-                  >
-                    Login
-                  </button>
-                  {/* Sign Up */}
-                      <button
-                        onClick={() => setShowSignup(true)}
-                        className="bg-yellow-400 text-black px-4 py-2 rounded font-semibold hover:bg-yellow-300 shadow"
-                      >
-                        Sign Up
-                      </button>
-
-                  {profileOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white text-black rounded shadow-lg py-2 z-50">
-                      <div className="px-4 py-2 text-gray-600 text-sm border-b">
-                        New customer?{" "}
-                        <button
-                          onClick={() => {
-                            setShowSignup(true);
-                            setProfileOpen(false);
-                          }}
-                          className="text-blue-600 font-semibold"
-                        >
-                          Sign Up
-                        </button>
-                      </div>
-
-                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                        👤 My Profile
-                      </button>
-
-                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                        🛒 Orders
-                      </button>
-
-                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                        ⭐ Rewards
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ---------- LOGGED IN ---------- */}
-              {isLoggedIn && (
-                <div className="relative">
-                  <button
-                    onClick={() => setProfileOpen(prev => !prev)}
-                    className="bg-white text-blue-600 px-4 py-2 rounded flex items-center gap-2 shadow"
-                  >
-                    <span className="text-xl">👤</span>
-                    <span className={`${profileOpen ? "rotate-180" : ""}`}>⌄</span>
-                  </button>
-
-                  {profileOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white text-black rounded shadow-lg py-2 z-50">
-                      <button className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                        👤 My Profile
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setProfileOpen(false);
-                          navigate('/orders');
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
-                      >
-                        🛒 Orders
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setProfileOpen(false);
-                          alert("Rewards Clicked");
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
-                      >
-                        ⭐ Rewards
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setProfileOpen(false);
-                          logout();
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-gray-100 border-t"
-                      >
-                        🔓 Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
-
-        </div>
-
-        {/* ROW: Categories (unchanged) */}
-        <div className="w-full bg-blue-500">
-          <div className="max-w-7xl mx-auto px-4 py-2">
-            <div
-              className="grid gap-3"
-              style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}
-            >
-              {['Electronics', 'Clothing', 'Grocery', 'Stationery'].map(c => (
-                <button
-                  key={c}
-                  className="px-3 py-2 bg-white text-black rounded shadow hover:shadow-md whitespace-nowrap min-w-[120px]"
-                  onClick={() => { setSearch(c); setPage(0); fetchProducts({ q: c, p: 0, s: size, sortBy: sort }); }}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-          {/* ROW 4: Filters / pagination */}
+          {/* ROW 2: Filters / pagination */}
           <div className="w-full bg-blue-600">
             <div className="max-w-7xl mx-auto px-4 py-2">
               <div className="mt-3 flex items-center justify-between gap-4">
