@@ -9,6 +9,15 @@ import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import './App.css';
 import IndiaStateSelect from "./components/IndiaStateSelect";
+import {
+  FaUser,
+  FaUserPlus,
+  FaUserCircle,
+  FaShoppingCart,
+  FaSearch,
+  FaChevronDown,
+  FaSignOutAlt
+} from "react-icons/fa";
 export default function FlipkartLikeApp() {
   // ----------------------------
   // STATES
@@ -182,8 +191,6 @@ export default function FlipkartLikeApp() {
   useEffect(() => {
     fetchProducts({ q: search, p: page, s: size, sortBy: sort });
   }, [page, size, sort, fetchProducts, search]);
-
-
 
   function logout() {
     setToken(null);
@@ -794,125 +801,174 @@ async function submitManualAddrForLoggedIn(e) {
     return `${start}–${end}`;
   }
 
+  const [animateCart, setAnimateCart] = useState(false);
+  const prevTotalRef = useRef(totalItems);
+   useEffect(() => {
+      if (totalItems > prevTotalRef.current) {
+        setAnimateCart(true);
+
+        const t = setTimeout(() => setAnimateCart(false), 300);
+        return () => clearTimeout(t);
+      }
+
+      prevTotalRef.current = totalItems;
+    }, [totalItems]);
+
   return (
     <>
       {/* --- REPLACE HEADER WITH THIS BLOCK --- */}
       <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
         <div className="max-w-7xl mx-auto px-4 py-2">
           {/* ROW 1: Logo | Search | Cart */}
-          <div className="flex items-center gap-4">
+          <div className="max-w-7xl mx-auto px-4 py-2">
 
-            {/* Logo */}
-            <div className="flex-none">
-              <img
-                src="/smartsale.png"
-                alt="SmartSale"
-                className="h-10 w-auto object-contain"
-              />
-            </div>
+              {/* ROW 1 */}
+              <div className="flex items-center gap-4">
 
-            {/* Search */}
-            <div className="flex w-full max-w-4xl bg-white rounded shadow-sm border h-10">
-              <select className="bg-gray-100 text-sm px-3 h-10 border-r outline-none">
-                <option value="all">All</option>
-                <option value="electronics">Electronics</option>
-                <option value="grocery">Grocery</option>
-              </select>
+                {/* Logo */}
+                <div className="flex-none">
+                  <img
+                    src="/smartsale.png"
+                    alt="SmartSale"
+                    className="h-10 w-auto object-contain"
+                  />
+                </div>
 
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search SmartSales.in"
-                className="flex-1 h-10 px-3 text-black outline-none"
-              />
+                {/* Search */}
+                <div className="flex w-full max-w-4xl bg-white rounded shadow-sm border h-10">
+                  <select className="bg-gray-100 text-sm px-3 h-10 border-r outline-none">
+                    <option value="all">All</option>
+                    <option value="electronics">Electronics</option>
+                    <option value="grocery">Grocery</option>
+                  </select>
 
-              <button
-                onClick={() => {
-                  setPage(0);
-                  fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
-                }}
-                className="h-10 bg-yellow-400 px-4 flex items-center justify-center hover:bg-yellow-500"
-              >
-                🔍
-              </button>
-            </div>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search SmartSales.in"
+                    className="flex-1 h-10 px-3 text-black outline-none"
+                  />
 
-            {/* NOT LOGGED IN → Login & Sign Up */}
-            {!isLoggedIn && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="h-10 px-4 bg-white text-blue-600 rounded font-semibold hover:bg-gray-100 border"
-                >
-                  Login
-                </button>
+                  <button
+                    onClick={() => {
+                      setPage(0);
+                      fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
+                    }}
+                    className="h-10 bg-yellow-400 px-4 flex items-center justify-center hover:bg-yellow-500"
+                  >
+                    <FaSearch className="text-black" />
+                  </button>
+                </div>
 
-                <button
-                  onClick={() => setShowSignup(true)}
-                  className="h-10 px-4 bg-yellow-400 text-black rounded font-semibold hover:bg-yellow-300"
-                >
-                  Sign Up
-                </button>
-              </div>
-            )}
+                {/* NOT LOGGED IN */}
+                {!isLoggedIn && (
+                  <div className="flex items-center gap-2">
 
-            {/* LOGGED IN → Profile icon */}
-            {isLoggedIn && (
-              <div className="relative">
-                <button
-                  onClick={() => setProfileOpen(prev => !prev)}
-                  className="h-10 px-3 bg-white text-blue-600 rounded flex items-center gap-1 shadow"
-                >
-                  <span className="text-xl">👤</span>
-                  <span className={`${profileOpen ? "rotate-180" : ""}`}>⌄</span>
-                </button>
-
-                {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded shadow-lg py-2 z-50">
-                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
-                      👤 My Profile
-                    </button>
-
+                    {/* Login */}
                     <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/orders');
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                      onClick={() => navigate("/login")}
+                      className="h-10 px-4 bg-white text-blue-600 rounded hover:bg-gray-100 border flex items-center justify-center"
+                      title="Login"
                     >
-                      🛒 Orders
+                      <FaUser size={18} />
                     </button>
 
+                    {/* Sign Up */}
                     <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        logout();
-                      }}
-                      className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 border-t"
+                      onClick={() => setShowSignup(true)}
+                      className="h-10 px-4 bg-yellow-400 text-black rounded hover:bg-yellow-300 flex items-center justify-center"
+                      title="Sign Up"
                     >
-                      🔓 Logout
+                      <FaUserPlus size={18} />
                     </button>
+
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Cart */}
-            <div className="flex-none">
-              <button
-                className="h-10 bg-white text-blue-600 px-3 rounded flex items-center gap-1"
-                onClick={() => setIsCartOpen(true)}
-              >
-                🛒 ({totalItems})
-              </button>
+                {/* LOGGED IN */}
+                {isLoggedIn && (
+                  <div className="relative">
+
+                    <button
+                      onClick={() => setProfileOpen(prev => !prev)}
+                      className="h-10 px-3 bg-white text-blue-600 rounded flex items-center gap-1 shadow"
+                    >
+                      <FaUserCircle size={22} />
+                      <FaChevronDown
+                        className={`transition-transform ${profileOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {profileOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded shadow-lg py-2 z-50">
+
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                        >
+                          <FaUser /> My Profile
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            navigate("/orders");
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                        >
+                          <FaShoppingCart /> Orders
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            logout();
+                          }}
+                          className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 border-t flex items-center gap-2"
+                        >
+                          <FaSignOutAlt /> Logout
+                        </button>
+
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cart */}
+                <div className="flex-none">
+                  <button
+                    onClick={() => setIsCartOpen(true)}
+                    className="relative h-10 bg-white text-blue-600 px-3 rounded flex items-center"
+                  >
+                    <FaShoppingCart size={18} />
+
+                    {totalItems > 0 && (
+                      <span
+                        className={`
+                          absolute -top-1 -right-1
+                          bg-red-600 text-white
+                          text-xs font-bold
+                          rounded-full
+                          min-w-[18px] h-[18px]
+                          flex items-center justify-center
+                          px-1
+                          transition-transform duration-200
+                          ${animateCart ? "scale-125" : "scale-100"}
+                        `}
+                      >
+                        {totalItems > 99 ? "99+" : totalItems}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+              </div>
             </div>
-          </div>
           </div>
           {/* ROW 2: Filters / pagination */}
           <div className="w-full bg-blue-600">
-            <div className="max-w-7xl mx-auto px-4 py-2">
-              <div className="mt-3 flex items-center justify-between gap-4">
+            <div className="max-w-7xl mx-auto px-4 py-1">
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <label className="text-white text-sm hidden sm:inline">Show</label>
                   <select value={size} onChange={e => { setSize(Number(e.target.value)); setPage(0); }} className="text-black px-2 py-1 rounded">
