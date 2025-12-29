@@ -845,7 +845,7 @@ async function submitManualAddrForLoggedIn(e) {
                   onClick={() => navigate('/login')}
                   className="h-10 px-4 bg-white text-blue-600 rounded font-semibold hover:bg-gray-100 border"
                 >
-                  Login
+                  👤
                 </button>
 
                 <button
