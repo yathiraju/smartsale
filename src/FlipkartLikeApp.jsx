@@ -9,6 +9,15 @@ import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import './App.css';
 import IndiaStateSelect from "./components/IndiaStateSelect";
+import {
+  FaUser,
+  FaUserPlus,
+  FaUserCircle,
+  FaShoppingCart,
+  FaSearch,
+  FaChevronDown,
+  FaSignOutAlt
+} from "react-icons/fa";
 export default function FlipkartLikeApp() {
   // ----------------------------
   // STATES
@@ -800,114 +809,133 @@ async function submitManualAddrForLoggedIn(e) {
       <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
         <div className="max-w-7xl mx-auto px-4 py-2">
           {/* ROW 1: Logo | Search | Cart */}
-          <div className="flex items-center gap-4">
+          <div className="max-w-7xl mx-auto px-4 py-2">
 
-            {/* Logo */}
-            <div className="flex-none">
-              <img
-                src="/smartsale.png"
-                alt="SmartSale"
-                className="h-10 w-auto object-contain"
-              />
-            </div>
+              {/* ROW 1 */}
+              <div className="flex items-center gap-4">
 
-            {/* Search */}
-            <div className="flex w-full max-w-4xl bg-white rounded shadow-sm border h-10">
-              <select className="bg-gray-100 text-sm px-3 h-10 border-r outline-none">
-                <option value="all">All</option>
-                <option value="electronics">Electronics</option>
-                <option value="grocery">Grocery</option>
-              </select>
+                {/* Logo */}
+                <div className="flex-none">
+                  <img
+                    src="/smartsale.png"
+                    alt="SmartSale"
+                    className="h-10 w-auto object-contain"
+                  />
+                </div>
 
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search SmartSales.in"
-                className="flex-1 h-10 px-3 text-black outline-none"
-              />
+                {/* Search */}
+                <div className="flex w-full max-w-4xl bg-white rounded shadow-sm border h-10">
+                  <select className="bg-gray-100 text-sm px-3 h-10 border-r outline-none">
+                    <option value="all">All</option>
+                    <option value="electronics">Electronics</option>
+                    <option value="grocery">Grocery</option>
+                  </select>
 
-              <button
-                onClick={() => {
-                  setPage(0);
-                  fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
-                }}
-                className="h-10 bg-yellow-400 px-4 flex items-center justify-center hover:bg-yellow-500"
-              >
-                🔍
-              </button>
-            </div>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search SmartSales.in"
+                    className="flex-1 h-10 px-3 text-black outline-none"
+                  />
 
-            {/* NOT LOGGED IN → Login & Sign Up */}
-            {!isLoggedIn && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="h-10 px-4 bg-white text-blue-600 rounded font-semibold hover:bg-gray-100 border"
-                >
-                  👤
-                </button>
+                  <button
+                    onClick={() => {
+                      setPage(0);
+                      fetchProducts({ q: search, p: 0, s: size, sortBy: sort });
+                    }}
+                    className="h-10 bg-yellow-400 px-4 flex items-center justify-center hover:bg-yellow-500"
+                  >
+                    <FaSearch className="text-black" />
+                  </button>
+                </div>
 
-                <button
-                  onClick={() => setShowSignup(true)}
-                  className="h-10 px-4 bg-yellow-400 text-black rounded font-semibold hover:bg-yellow-300"
-                >
-                  Sign Up
-                </button>
-              </div>
-            )}
+                {/* NOT LOGGED IN */}
+                {!isLoggedIn && (
+                  <div className="flex items-center gap-2">
 
-            {/* LOGGED IN → Profile icon */}
-            {isLoggedIn && (
-              <div className="relative">
-                <button
-                  onClick={() => setProfileOpen(prev => !prev)}
-                  className="h-10 px-3 bg-white text-blue-600 rounded flex items-center gap-1 shadow"
-                >
-                  <span className="text-xl">👤</span>
-                  <span className={`${profileOpen ? "rotate-180" : ""}`}>⌄</span>
-                </button>
-
-                {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded shadow-lg py-2 z-50">
-                    <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
-                      👤 My Profile
-                    </button>
-
+                    {/* Login */}
                     <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        navigate('/orders');
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                      onClick={() => navigate("/login")}
+                      className="h-10 px-4 bg-white text-blue-600 rounded hover:bg-gray-100 border flex items-center justify-center"
+                      title="Login"
                     >
-                      🛒 Orders
+                      <FaUser size={18} />
                     </button>
 
+                    {/* Sign Up */}
                     <button
-                      onClick={() => {
-                        setProfileOpen(false);
-                        logout();
-                      }}
-                      className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 border-t"
+                      onClick={() => setShowSignup(true)}
+                      className="h-10 px-4 bg-yellow-400 text-black rounded hover:bg-yellow-300 flex items-center justify-center"
+                      title="Sign Up"
                     >
-                      🔓 Logout
+                      <FaUserPlus size={18} />
                     </button>
+
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Cart */}
-            <div className="flex-none">
-              <button
-                className="h-10 bg-white text-blue-600 px-3 rounded flex items-center gap-1"
-                onClick={() => setIsCartOpen(true)}
-              >
-                🛒 ({totalItems})
-              </button>
+                {/* LOGGED IN */}
+                {isLoggedIn && (
+                  <div className="relative">
+
+                    <button
+                      onClick={() => setProfileOpen(prev => !prev)}
+                      className="h-10 px-3 bg-white text-blue-600 rounded flex items-center gap-1 shadow"
+                    >
+                      <FaUserCircle size={22} />
+                      <FaChevronDown
+                        className={`transition-transform ${profileOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {profileOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded shadow-lg py-2 z-50">
+
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                        >
+                          <FaUser /> My Profile
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            navigate("/orders");
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                        >
+                          <FaShoppingCart /> Orders
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            logout();
+                          }}
+                          className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 border-t flex items-center gap-2"
+                        >
+                          <FaSignOutAlt /> Logout
+                        </button>
+
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cart */}
+                <div className="flex-none">
+                  <button
+                    className="h-10 bg-white text-blue-600 px-3 rounded flex items-center gap-1"
+                    onClick={() => setIsCartOpen(true)}
+                  >
+                    <FaShoppingCart size={18} />
+                    <span>({totalItems})</span>
+                  </button>
+                </div>
+
+              </div>
             </div>
-          </div>
           </div>
           {/* ROW 2: Filters / pagination */}
           <div className="w-full bg-blue-600">
