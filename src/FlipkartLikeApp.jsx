@@ -836,7 +836,7 @@ async function submitManualAddrForLoggedIn(e) {
 
                 {/* Search */}
                 <div className="flex w-full max-w-4xl bg-white rounded shadow-sm border h-10">
-                  <select className="bg-gray-100 text-sm px-3 h-10 border-r outline-none">
+                  <select className="bg-yellow-400 hover:bg-yellow-500 text-black text-sm px-3 h-10 border-r border-yellow-500 outline-none cursor-pointer">
                     <option value="all">All</option>
                     <option value="electronics">Electronics</option>
                     <option value="grocery">Grocery</option>
