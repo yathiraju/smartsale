@@ -192,8 +192,6 @@ export default function FlipkartLikeApp() {
     fetchProducts({ q: search, p: page, s: size, sortBy: sort });
   }, [page, size, sort, fetchProducts, search]);
 
-
-
   function logout() {
     setToken(null);
     setUser(null);
@@ -803,6 +801,19 @@ async function submitManualAddrForLoggedIn(e) {
     return `${start}–${end}`;
   }
 
+  const [animateCart, setAnimateCart] = useState(false);
+  const prevTotalRef = useRef(totalItems);
+   useEffect(() => {
+      if (totalItems > prevTotalRef.current) {
+        setAnimateCart(true);
+
+        const t = setTimeout(() => setAnimateCart(false), 300);
+        return () => clearTimeout(t);
+      }
+
+      prevTotalRef.current = totalItems;
+    }, [totalItems]);
+
   return (
     <>
       {/* --- REPLACE HEADER WITH THIS BLOCK --- */}
@@ -926,11 +937,28 @@ async function submitManualAddrForLoggedIn(e) {
                 {/* Cart */}
                 <div className="flex-none">
                   <button
-                    className="h-10 bg-white text-blue-600 px-3 rounded flex items-center gap-1"
                     onClick={() => setIsCartOpen(true)}
+                    className="relative h-10 bg-white text-blue-600 px-3 rounded flex items-center"
                   >
                     <FaShoppingCart size={18} />
-                    <span>({totalItems})</span>
+
+                    {totalItems > 0 && (
+                      <span
+                        className={`
+                          absolute -top-1 -right-1
+                          bg-red-600 text-white
+                          text-xs font-bold
+                          rounded-full
+                          min-w-[18px] h-[18px]
+                          flex items-center justify-center
+                          px-1
+                          transition-transform duration-200
+                          ${animateCart ? "scale-125" : "scale-100"}
+                        `}
+                      >
+                        {totalItems > 99 ? "99+" : totalItems}
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -939,8 +967,8 @@ async function submitManualAddrForLoggedIn(e) {
           </div>
           {/* ROW 2: Filters / pagination */}
           <div className="w-full bg-blue-600">
-            <div className="max-w-7xl mx-auto px-4 py-2">
-              <div className="mt-3 flex items-center justify-between gap-4">
+            <div className="max-w-7xl mx-auto px-4 py-1">
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <label className="text-white text-sm hidden sm:inline">Show</label>
                   <select value={size} onChange={e => { setSize(Number(e.target.value)); setPage(0); }} className="text-black px-2 py-1 rounded">
