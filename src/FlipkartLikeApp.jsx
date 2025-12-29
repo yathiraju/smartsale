@@ -9,6 +9,8 @@ import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
 import './App.css';
 import IndiaStateSelect from "./components/IndiaStateSelect";
+import MobileHeader from "./components/header/MobileHeader";
+import MobileDrawer from "./components/header/MobileDrawer";
 import {
   FaUser,
   FaUserPlus,
@@ -119,6 +121,8 @@ export default function FlipkartLikeApp() {
     const host = (typeof getApiHost === 'function' ? getApiHost() : null) || 'http://localhost:8080';
     return axios.create({ baseURL: host, timeout: 30000 });
   }, []);
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ----------------------------
   // FETCH PRODUCTS (paged, axios + AbortController)
@@ -816,8 +820,21 @@ async function submitManualAddrForLoggedIn(e) {
 
   return (
     <>
+    <MobileHeader
+      search={search}
+      setSearch={setSearch}
+      totalItems={totalItems}
+      isLoggedIn={isLoggedIn}
+      onCartClick={() => setIsCartOpen(true)}
+      onMenuOpen={() => setMobileMenuOpen(true)}
+    />
+
+    <MobileDrawer
+      open={mobileMenuOpen}
+      onClose={() => setMobileMenuOpen(false)}
+    />
       {/* --- REPLACE HEADER WITH THIS BLOCK --- */}
-      <header className="bg-blue-600 text-white sticky top-0 z-20 shadow">
+      <header className="hidden md:block bg-blue-600 text-white sticky top-0 z-20 shadow">
         <div className="max-w-7xl mx-auto px-4 py-2">
           {/* ROW 1: Logo | Search | Cart */}
           <div className="max-w-7xl mx-auto px-4 py-2">
