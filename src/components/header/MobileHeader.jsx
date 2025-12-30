@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import {
   FaUser,
-  FaUserPlus,
+  //FaUserPlus,
   FaUserCircle,
   FaShoppingCart,
   FaSearch,
