@@ -34,19 +34,11 @@ export default function FlipkartLikeApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
   const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
 
-  const usernameRef = useRef(null);
-
 
   const [paying, setPaying] = useState(false);
 
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const [signupLoading, setSignupLoading] = useState(false);
-  const [signupData, setSignupData] = useState({
-    username: '', email: '', password: '', role: 'USER',
-    name: '', phone: '', line1: '', line2: '', city: '', state: '',
-    pincode: '', country: 'IN', lat: '', lng: ''
-  });
 
   // guest address (when user is NOT logged in and clicks Buy Now)
     const [guestAddrModalOpen, setGuestAddrModalOpen] = useState(false);
@@ -94,14 +86,12 @@ export default function FlipkartLikeApp() {
 
   // Axios controller refs for cancellation
   const productsCtrlRef = useRef(null);
-  const signupCtrlRef = useRef(null);
+
   const addrCtrlRef = useRef(null);
   const shippingCtrlRef = useRef(null);
 
   // validations - utilities
-  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPhone = (phone) => /^\d{10}$/.test(phone);
-  const isValidName = (name) => /^[A-Za-z\s]+$/.test(name);
  const isValidPincode = (pin) =>  /^[1-9][0-9]{5}$/.test(pin);
   // ----------------------------
   // image URL helper (stable)
@@ -206,100 +196,6 @@ export default function FlipkartLikeApp() {
     setDeliveryFee(0);
     setShippingChecked(false);
   }
-
-  // ----------------------------
-  // SIGNUP (axios)
-  // ----------------------------
-  async function signupSubmit(e) {
-    e.preventDefault();
-    if (signupLoading) return;
-    const {
-        username,
-        email,
-        password,
-        name,
-        phone,
-        line1,
-        city,
-        state,
-        pincode
-      } = signupData;
-
-      // 🔴 Mandatory checks
-      if (!username.trim()) return alert("Username is required");
-      if (!email.trim()) return alert("Email is required");
-      if (!password.trim()) return alert("Password is required");
-      if (!name.trim()) return alert("Name is required");
-      if (!phone.trim()) return alert("Phone is required");
-      if (!line1.trim()) return alert("Address Line 1 is required");
-      if (!city.trim()) return alert("City is required");
-      if (!state.trim()) return alert("State is required");
-      if (!pincode.trim()) return alert("Pincode is required");
-
-      // 🔴 Format validations
-      if (!isValidEmail(email))
-        return alert("Please enter a valid email address");
-
-      if (!isValidPhone(phone))
-        return alert("Phone number must be exactly 10 digits");
-
-      if (!isValidName(name))
-        return alert("Name should contain only letters");
-
-      if (!isValidPincode(pincode))
-        return alert("Pincode must be a valid 6-digit number");
-
-      // ✅ Passed all validations — continue signup
-      setSignupLoading(true);
-
-    // cancel previous signup call if any
-    if (signupCtrlRef.current) {
-      try { signupCtrlRef.current.abort(); } catch (_) {}
-    }
-    const ctrl = new AbortController();
-    signupCtrlRef.current = ctrl;
-    const http = getHttp();
-
-    try {
-      const payload = {
-        users: {
-          username: signupData.username,
-          password: signupData.password,
-          email: signupData.email,
-          role: signupData.role
-        },
-        name: signupData.name,
-        phone: signupData.phone,
-        line1: signupData.line1,
-        line2: signupData.line2,
-        city: signupData.city,
-        state: signupData.state,
-        pincode: signupData.pincode,
-        country: signupData.country,
-        lat: signupData.lat ? Number(signupData.lat) : null,
-        lng: signupData.lng ? Number(signupData.lng) : null
-      };
-
-      const res = await http.post('/api/signup', payload, { signal: ctrl.signal, headers: { 'Content-Type': 'application/json' } });
-      if (res.status >= 200 && res.status < 300) {
-        alert('Signup successful. You can now log in.');
-        //setShowSignup(false);
-        if (usernameRef.current) usernameRef.current.value = signupData.username;
-      } else {
-        alert('Signup failed: ' + JSON.stringify(res.data || res.statusText || res.status));
-      }
-    } catch (err) {
-      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
-      if (!isCanceled) {
-        console.error('Signup request failed', err);
-        alert('Signup request failed');
-      }
-    } finally {
-      setSignupLoading(false);
-      signupCtrlRef.current = null;
-    }
-  }
-  function signupFieldChange(k, v) { setSignupData(prev => ({ ...prev, [k]: v })); }
 
   // ----------------------------
   // CART LOGIC (mutations reset shipping state)

@@ -26,14 +26,20 @@ export default function SignupPage() {
     country: "IN"
   });
 
+  // 🔴 inline error states
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState("");
+
   // ---------- validations ----------
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPhone = (phone) => /^\d{10}$/.test(phone);
   const isValidName = (name) => /^[A-Za-z\s]+$/.test(name);
   const isValidPincode = (pin) => /^[1-9][0-9]{5}$/.test(pin);
 
-  function update(k, v) {
-    setForm(prev => ({ ...prev, [k]: v }));
+  function update(key, value) {
+    setForm(prev => ({ ...prev, [key]: value }));
+    setErrors(prev => ({ ...prev, [key]: "" })); // clear field error
+    setFormError("");
   }
 
   async function submit(e) {
@@ -41,19 +47,47 @@ export default function SignupPage() {
     if (loading) return;
 
     const {
-      username, email, password, name,
-      phone, line1, city, state, pincode
+      username,
+      email,
+      password,
+      name,
+      phone,
+      line1,
+      city,
+      state,
+      pincode
     } = form;
 
-    // required checks
-    if (!username || !email || !password || !name || !phone || !line1 || !city || !state || !pincode) {
-      return alert("All mandatory fields must be filled");
-    }
+    const newErrors = {};
 
-    if (!isValidEmail(email)) return alert("Invalid email");
-    if (!isValidPhone(phone)) return alert("Phone must be 10 digits");
-    if (!isValidName(name)) return alert("Name must contain only letters");
-    if (!isValidPincode(pincode)) return alert("Invalid pincode");
+    // 🔴 Mandatory checks
+    if (!username.trim()) newErrors.username = "Username is required";
+    if (!email.trim()) newErrors.email = "Email is required";
+    if (!password.trim()) newErrors.password = "Password is required";
+    if (!name.trim()) newErrors.name = "Name is required";
+    if (!phone.trim()) newErrors.phone = "Phone is required";
+    if (!line1.trim()) newErrors.line1 = "Address Line 1 is required";
+    if (!city.trim()) newErrors.city = "City is required";
+    if (!state.trim()) newErrors.state = "State is required";
+    if (!pincode.trim()) newErrors.pincode = "Pincode is required";
+
+    // 🔴 Format validations
+    if (email && !isValidEmail(email))
+      newErrors.email = "Please enter a valid email address";
+
+    if (phone && !isValidPhone(phone))
+      newErrors.phone = "Phone number must be exactly 10 digits";
+
+    if (name && !isValidName(name))
+      newErrors.name = "Name should contain only letters";
+
+    if (pincode && !isValidPincode(pincode))
+      newErrors.pincode = "Pincode must be a valid 6-digit number";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
     setLoading(true);
 
@@ -82,12 +116,11 @@ export default function SignupPage() {
 
       await http.post("/api/signup", payload);
 
-      alert("Signup successful. Please login.");
       navigate("/login");
 
     } catch (err) {
       console.error(err);
-      alert("Signup failed");
+      setFormError("Signup failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -103,50 +136,123 @@ export default function SignupPage() {
           Create Account
         </h2>
 
+        {/* 🔴 Form-level error */}
+        {formError && (
+          <div className="mb-3 bg-red-100 text-red-700 px-3 py-2 rounded">
+            {formError}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
 
-          <input placeholder="Username" value={form.username}
-            onChange={e => update("username", e.target.value)}
-            className="border p-2 rounded" />
+          {/* Username */}
+          <div>
+            <input
+              ref={usernameRef}
+              placeholder="Username"
+              value={form.username}
+              onChange={e => update("username", e.target.value)}
+              className="border p-2 rounded w-full"
+            />
+            {errors.username && <p className="text-red-600 text-xs">{errors.username}</p>}
+          </div>
 
-          <input placeholder="Email" value={form.email}
-            onChange={e => update("email", e.target.value)}
-            className="border p-2 rounded" />
+          {/* Email */}
+          <div>
+            <input
+              placeholder="Email"
+              value={form.email}
+              onChange={e => update("email", e.target.value)}
+              className="border p-2 rounded w-full"
+            />
+            {errors.email && <p className="text-red-600 text-xs">{errors.email}</p>}
+          </div>
 
-          <input type="password" placeholder="Password" value={form.password}
-            onChange={e => update("password", e.target.value)}
-            className="border p-2 rounded" />
+          {/* Password */}
+          <div>
+            <input
+              type="password"
+              placeholder="Password"
+              value={form.password}
+              onChange={e => update("password", e.target.value)}
+              className="border p-2 rounded w-full"
+            />
+            {errors.password && <p className="text-red-600 text-xs">{errors.password}</p>}
+          </div>
 
-          <input placeholder="Name" value={form.name}
-            onChange={e => update("name", e.target.value.replace(/[^A-Za-z\s]/g, ""))}
-            className="border p-2 rounded" />
+          {/* Name */}
+          <div>
+            <input
+              placeholder="Name"
+              value={form.name}
+              onChange={e => update("name", e.target.value.replace(/[^A-Za-z\s]/g, ""))}
+              className="border p-2 rounded w-full"
+            />
+            {errors.name && <p className="text-red-600 text-xs">{errors.name}</p>}
+          </div>
 
-          <input placeholder="Phone" maxLength={10} value={form.phone}
-            onChange={e => update("phone", e.target.value.replace(/\D/g, ""))}
-            className="border p-2 rounded" />
+          {/* Phone */}
+          <div>
+            <input
+              placeholder="Phone"
+              maxLength={10}
+              value={form.phone}
+              onChange={e => update("phone", e.target.value.replace(/\D/g, ""))}
+              className="border p-2 rounded w-full"
+            />
+            {errors.phone && <p className="text-red-600 text-xs">{errors.phone}</p>}
+          </div>
 
-          <input placeholder="Address Line 1" value={form.line1}
-            onChange={e => update("line1", e.target.value)}
-            className="border p-2 rounded" />
+          {/* Address Line 1 */}
+          <div>
+            <input
+              placeholder="Address Line 1"
+              value={form.line1}
+              onChange={e => update("line1", e.target.value)}
+              className="border p-2 rounded w-full"
+            />
+            {errors.line1 && <p className="text-red-600 text-xs">{errors.line1}</p>}
+          </div>
 
-          <input placeholder="Address Line 2" value={form.line2}
+          {/* Address Line 2 */}
+          <input
+            placeholder="Address Line 2"
+            value={form.line2}
             onChange={e => update("line2", e.target.value)}
-            className="border p-2 rounded" />
+            className="border p-2 rounded col-span-2"
+          />
 
-          <input placeholder="City" value={form.city}
-            onChange={e => update("city", e.target.value)}
-            className="border p-2 rounded" />
+          {/* City */}
+          <div>
+            <input
+              placeholder="City"
+              value={form.city}
+              onChange={e => update("city", e.target.value)}
+              className="border p-2 rounded w-full"
+            />
+            {errors.city && <p className="text-red-600 text-xs">{errors.city}</p>}
+          </div>
 
-          <div className="col-span-2">
+          {/* State */}
+          <div>
             <IndiaStateSelect
               value={form.state}
               onChange={state => update("state", state)}
             />
+            {errors.state && <p className="text-red-600 text-xs">{errors.state}</p>}
           </div>
 
-          <input placeholder="Pincode" maxLength={6} value={form.pincode}
-            onChange={e => update("pincode", e.target.value.replace(/\D/g, ""))}
-            className="border p-2 rounded" />
+          {/* Pincode */}
+          <div>
+            <input
+              placeholder="Pincode"
+              maxLength={6}
+              value={form.pincode}
+              onChange={e => update("pincode", e.target.value.replace(/\D/g, ""))}
+              className="border p-2 rounded w-full"
+            />
+            {errors.pincode && <p className="text-red-600 text-xs">{errors.pincode}</p>}
+          </div>
         </div>
 
         <div className="flex justify-between mt-4">
@@ -161,6 +267,7 @@ export default function SignupPage() {
           <button
             type="submit"
             className="bg-blue-600 text-white px-4 py-1 rounded"
+            disabled={loading}
           >
             {loading ? "Signing up..." : "Sign Up"}
           </button>
