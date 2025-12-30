@@ -103,6 +103,11 @@ export default function MobileHeader({
             className="absolute right-3 top-14 w-48 bg-white rounded shadow text-black"
             onClick={e => e.stopPropagation()}
           >
+          <button
+               className="w-full px-4 py-3 text-left hover:bg-gray-100 flex items-center gap-2"
+                                  >
+                                    <FaUser /> My Profile
+                                  </button>
             <button
               onClick={() => {
                 setProfileOpen(false);
