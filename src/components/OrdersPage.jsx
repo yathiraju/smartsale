@@ -125,10 +125,6 @@ useEffect(() => {
                 <div className="text-sm text-gray-600">
                   Placed on {new Date(order.createdAt).toLocaleString()}
                 </div>
-                <div className="text-sm">
-                  Status:{' '}
-                  <span className="font-semibold">{order.status}</span>
-                </div>
               </div>
 
               <div className="text-right">
@@ -137,9 +133,6 @@ useEffect(() => {
                 </div>
                 <div className="text-sm text-gray-600">
                   Payment: {order.paymentStatus}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Ref: {order.paymentRef}
                 </div>
               </div>
             </div>
@@ -156,9 +149,6 @@ useEffect(() => {
                   <div>
                     <div className="font-medium">
                       {item.product.name}
-                    </div>
-                    <div className="text-gray-500 text-xs">
-                      SKU: {item.product.sku} | Tax {item.product.taxRate}%
                     </div>
                   </div>
 

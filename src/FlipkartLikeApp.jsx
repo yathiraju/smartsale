@@ -68,6 +68,7 @@ export default function FlipkartLikeApp() {
     pincode: '',
     country: 'IN'
   });
+  const [showAddNewAddr, setShowAddNewAddr] = useState(false);
   const [manualAddrSubmitting, setManualAddrSubmitting] = useState(false);
   // ---------- end NEW state ----------
 
@@ -827,6 +828,7 @@ async function submitManualAddrForLoggedIn(e) {
       isLoggedIn={isLoggedIn}
       onCartClick={() => setIsCartOpen(true)}
       onMenuOpen={() => setMobileMenuOpen(true)}
+      onLogout={logout}
     />
 
     <MobileDrawer
@@ -1197,21 +1199,122 @@ async function submitManualAddrForLoggedIn(e) {
 
             {addrLoading && <div>Loading addresses...</div>}
 
-            {!addrLoading && Array.isArray(addrChoices) && addrChoices.length > 0 && (
-              <div className="space-y-2 max-h-64 overflow-auto">
-                {addrChoices.map((a, idx) => (
-                  <div key={idx} className="p-3 border rounded flex justify-between items-center">
-                    <div>
-                      <div className="font-semibold">{a.name || a.users?.username || `Address ${idx + 1}`}</div>
-                      <div className="text-sm text-gray-600">{a.line1}{a.line2 ? ', ' + a.line2 : ''} • {a.city} • {a.pincode}</div>
+            {!addrLoading && Array.isArray(addrChoices) && addrChoices.length > 0 && !showAddNewAddr && (
+              <>
+                <div className="space-y-2 max-h-64 overflow-auto mb-3">
+                  {addrChoices.map((a, idx) => (
+                    <div key={idx} className="p-3 border rounded flex justify-between items-center">
+                      <div>
+                        <div className="font-semibold">
+                          {a.name || a.users?.username || `Address ${idx + 1}`}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {a.line1}{a.line2 ? ', ' + a.line2 : ''} • {a.city} • {a.pincode}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => chooseAddrFromList(a)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded"
+                      >
+                        Deliver here
+                      </button>
                     </div>
-                    <div>
-                      <button onClick={() => chooseAddrFromList(a)} className="bg-blue-600 text-white px-3 py-1 rounded">Select</button>
-                    </div>
+                  ))}
+                </div>
+
+                {/* ➕ Add New Address */}
+                <button
+                  onClick={() => setShowAddNewAddr(true)}
+                  className="w-full border border-dashed border-blue-500 text-blue-600 py-2 rounded hover:bg-blue-50"
+                >
+                  ➕ Add New Address
+                </button>
+              </>
+            )}
+            {showAddNewAddr && (
+              <div>
+                <h4 className="font-semibold mb-2">Add new delivery address</h4>
+
+                <form onSubmit={submitManualAddrForLoggedIn} className="grid grid-cols-1 gap-2">
+                  <input
+                    placeholder="Name"
+                    value={manualAddrFull.name}
+                    onChange={e => setManualAddrFull(prev => ({ ...prev, name: e.target.value }))}
+                    className="border p-2 rounded"
+                  />
+
+                  <input
+                    placeholder="Phone (10 digits)"
+                    value={manualAddrFull.phone}
+                    maxLength={10}
+                    onChange={e => setManualAddrFull(prev => ({
+                      ...prev,
+                      phone: e.target.value.replace(/\D/g, "")
+                    }))}
+                    className="border p-2 rounded"
+                  />
+
+                  <input
+                    placeholder="Address line 1"
+                    value={manualAddrFull.addressLine1}
+                    onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine1: e.target.value }))}
+                    className="border p-2 rounded"
+                  />
+
+                  <input
+                    placeholder="Address line 2 (optional)"
+                    value={manualAddrFull.addressLine2}
+                    onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine2: e.target.value }))}
+                    className="border p-2 rounded"
+                  />
+
+                  <input
+                    placeholder="City"
+                    value={manualAddrFull.city}
+                    onChange={e => setManualAddrFull(prev => ({ ...prev, city: e.target.value }))}
+                    className="border p-2 rounded"
+                  />
+
+                  <IndiaStateSelect
+                    value={manualAddrFull.state}
+                    onChange={state =>
+                      setManualAddrFull(prev => ({ ...prev, state }))
+                    }
+                  />
+
+                  <input
+                    placeholder="Pincode"
+                    value={manualAddrFull.pincode}
+                    maxLength={6}
+                    onChange={e =>
+                      setManualAddrFull(prev => ({
+                        ...prev,
+                        pincode: e.target.value.replace(/\D/g, "")
+                      }))
+                    }
+                    className="border p-2 rounded"
+                  />
+
+                  <div className="flex justify-between mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddNewAddr(false)}
+                      className="text-gray-500"
+                    >
+                      ← Back
+                    </button>
+
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white px-4 py-1 rounded"
+                    >
+                      {manualAddrSubmitting ? "Checking..." : "Use this address"}
+                    </button>
                   </div>
-                ))}
+                </form>
               </div>
             )}
+
 
             {!addrLoading && (!addrChoices || addrChoices.length === 0) && (
               <div>
