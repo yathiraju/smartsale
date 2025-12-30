@@ -34,20 +34,11 @@ export default function FlipkartLikeApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getToken()));
   const [usernameDisplay, setUsernameDisplay] = useState(localStorage.getItem('rzp_username') || '');
 
-  const usernameRef = useRef(null);
-
 
   const [paying, setPaying] = useState(false);
 
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const [showSignup, setShowSignup] = useState(false);
-  const [signupLoading, setSignupLoading] = useState(false);
-  const [signupData, setSignupData] = useState({
-    username: '', email: '', password: '', role: 'USER',
-    name: '', phone: '', line1: '', line2: '', city: '', state: '',
-    pincode: '', country: 'IN', lat: '', lng: ''
-  });
 
   // guest address (when user is NOT logged in and clicks Buy Now)
     const [guestAddrModalOpen, setGuestAddrModalOpen] = useState(false);
@@ -95,14 +86,12 @@ export default function FlipkartLikeApp() {
 
   // Axios controller refs for cancellation
   const productsCtrlRef = useRef(null);
-  const signupCtrlRef = useRef(null);
+
   const addrCtrlRef = useRef(null);
   const shippingCtrlRef = useRef(null);
 
   // validations - utilities
-  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPhone = (phone) => /^\d{10}$/.test(phone);
-  const isValidName = (name) => /^[A-Za-z\s]+$/.test(name);
  const isValidPincode = (pin) =>  /^[1-9][0-9]{5}$/.test(pin);
   // ----------------------------
   // image URL helper (stable)
@@ -207,100 +196,6 @@ export default function FlipkartLikeApp() {
     setDeliveryFee(0);
     setShippingChecked(false);
   }
-
-  // ----------------------------
-  // SIGNUP (axios)
-  // ----------------------------
-  async function signupSubmit(e) {
-    e.preventDefault();
-    if (signupLoading) return;
-    const {
-        username,
-        email,
-        password,
-        name,
-        phone,
-        line1,
-        city,
-        state,
-        pincode
-      } = signupData;
-
-      // 🔴 Mandatory checks
-      if (!username.trim()) return alert("Username is required");
-      if (!email.trim()) return alert("Email is required");
-      if (!password.trim()) return alert("Password is required");
-      if (!name.trim()) return alert("Name is required");
-      if (!phone.trim()) return alert("Phone is required");
-      if (!line1.trim()) return alert("Address Line 1 is required");
-      if (!city.trim()) return alert("City is required");
-      if (!state.trim()) return alert("State is required");
-      if (!pincode.trim()) return alert("Pincode is required");
-
-      // 🔴 Format validations
-      if (!isValidEmail(email))
-        return alert("Please enter a valid email address");
-
-      if (!isValidPhone(phone))
-        return alert("Phone number must be exactly 10 digits");
-
-      if (!isValidName(name))
-        return alert("Name should contain only letters");
-
-      if (!isValidPincode(pincode))
-        return alert("Pincode must be a valid 6-digit number");
-
-      // ✅ Passed all validations — continue signup
-      setSignupLoading(true);
-
-    // cancel previous signup call if any
-    if (signupCtrlRef.current) {
-      try { signupCtrlRef.current.abort(); } catch (_) {}
-    }
-    const ctrl = new AbortController();
-    signupCtrlRef.current = ctrl;
-    const http = getHttp();
-
-    try {
-      const payload = {
-        users: {
-          username: signupData.username,
-          password: signupData.password,
-          email: signupData.email,
-          role: signupData.role
-        },
-        name: signupData.name,
-        phone: signupData.phone,
-        line1: signupData.line1,
-        line2: signupData.line2,
-        city: signupData.city,
-        state: signupData.state,
-        pincode: signupData.pincode,
-        country: signupData.country,
-        lat: signupData.lat ? Number(signupData.lat) : null,
-        lng: signupData.lng ? Number(signupData.lng) : null
-      };
-
-      const res = await http.post('/api/signup', payload, { signal: ctrl.signal, headers: { 'Content-Type': 'application/json' } });
-      if (res.status >= 200 && res.status < 300) {
-        alert('Signup successful. You can now log in.');
-        setShowSignup(false);
-        if (usernameRef.current) usernameRef.current.value = signupData.username;
-      } else {
-        alert('Signup failed: ' + JSON.stringify(res.data || res.statusText || res.status));
-      }
-    } catch (err) {
-      const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
-      if (!isCanceled) {
-        console.error('Signup request failed', err);
-        alert('Signup request failed');
-      }
-    } finally {
-      setSignupLoading(false);
-      signupCtrlRef.current = null;
-    }
-  }
-  function signupFieldChange(k, v) { setSignupData(prev => ({ ...prev, [k]: v })); }
 
   // ----------------------------
   // CART LOGIC (mutations reset shipping state)
@@ -895,7 +790,7 @@ async function submitManualAddrForLoggedIn(e) {
 
                     {/* Sign Up */}
                     <button
-                      onClick={() => setShowSignup(true)}
+                      onClick={() => navigate("/signup")}
                       className="h-10 px-4 bg-yellow-400 text-black rounded hover:bg-yellow-300 flex items-center justify-center"
                       title="Sign Up"
                     >
@@ -1075,90 +970,6 @@ async function submitManualAddrForLoggedIn(e) {
         selectedAddress={selectedAddress}
         shippingChecked={shippingChecked}
       />
-
-      {/* SIGNUP MODAL */}
-      {showSignup && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <form onSubmit={signupSubmit} className="bg-white p-6 rounded shadow max-w-xl w-full">
-            <h2 className="text-xl font-bold mb-4">Create Account</h2>
-            <div className="grid grid-cols-2 gap-3 text-black">
-
-              <input placeholder="Username" value={signupData.username}
-                onChange={e => signupFieldChange("username", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="Email" value={signupData.email}
-                onChange={e => signupFieldChange("email", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input type="password" placeholder="Password" value={signupData.password}
-                onChange={e => signupFieldChange("password", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="Name" value={signupData.name}
-                onChange={e =>
-                    signupFieldChange(
-                      "name",
-                      e.target.value.replace(/[^A-Za-z\s]/g, "")
-                    )
-                  }
-                className="border p-2 rounded" />
-
-              <input
-                placeholder="Phone"
-                value={signupData.phone}
-                maxLength={10}
-                onChange={e =>
-                  signupFieldChange(
-                    "phone",
-                    e.target.value.replace(/\D/g, "")
-                  )
-                }
-                className="border p-2 rounded"
-              />
-
-              <input placeholder="Address Line 1" value={signupData.line1}
-                onChange={e => signupFieldChange("line1", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="Address Line 2" value={signupData.line2}
-                onChange={e => signupFieldChange("line2", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="City" value={signupData.city}
-                onChange={e => signupFieldChange("city", e.target.value)}
-                className="border p-2 rounded" />
-
-              {/* ✅ STATE DROPDOWN */}
-              <div className="col-span-2">
-                <IndiaStateSelect
-                  value={signupData.state}
-                  onChange={(state) => signupFieldChange("state", state)}
-                />
-              </div>
-
-              <input
-                placeholder="Pincode"
-                value={signupData.pincode}
-                maxLength={6}
-                onChange={e =>
-                  signupFieldChange(
-                    "pincode",
-                    e.target.value.replace(/\D/g, "")
-                  )
-                }
-                className="border p-2 rounded"
-              />
-
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4">
-              <button type="button" onClick={() => setShowSignup(false)}>Cancel</button>
-              <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded">{signupLoading ? '...' : 'Sign Up'}</button>
-            </div>
-          </form>
-        </div>
-      )}
 
         {/* GUEST ADDRESS MODAL (shown when Buy Now clicked and user not logged in) */}
         {guestAddrModalOpen && (

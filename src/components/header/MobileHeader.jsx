@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import {
   FaUser,
-  //FaUserPlus,
+  FaUserPlus,
   FaUserCircle,
   FaShoppingCart,
   FaSearch,
@@ -52,9 +52,9 @@ export default function MobileHeader({
                   <FaUser size={18} />
                 </button>
 
-               {/*  <button onClick={() => navigate("/signup")}>
+                 <button onClick={() => navigate("/signup")}>
                   <FaUserPlus size={18} />
-                </button> */}
+                </button>
               </>
             )}
 
