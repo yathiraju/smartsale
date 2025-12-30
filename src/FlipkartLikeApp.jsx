@@ -41,7 +41,6 @@ export default function FlipkartLikeApp() {
 
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const [showSignup, setShowSignup] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupData, setSignupData] = useState({
     username: '', email: '', password: '', role: 'USER',
@@ -284,7 +283,7 @@ export default function FlipkartLikeApp() {
       const res = await http.post('/api/signup', payload, { signal: ctrl.signal, headers: { 'Content-Type': 'application/json' } });
       if (res.status >= 200 && res.status < 300) {
         alert('Signup successful. You can now log in.');
-        setShowSignup(false);
+        //setShowSignup(false);
         if (usernameRef.current) usernameRef.current.value = signupData.username;
       } else {
         alert('Signup failed: ' + JSON.stringify(res.data || res.statusText || res.status));
@@ -895,7 +894,7 @@ async function submitManualAddrForLoggedIn(e) {
 
                     {/* Sign Up */}
                     <button
-                      onClick={() => setShowSignup(true)}
+                      onClick={() => navigate("/signup")}
                       className="h-10 px-4 bg-yellow-400 text-black rounded hover:bg-yellow-300 flex items-center justify-center"
                       title="Sign Up"
                     >
@@ -1075,90 +1074,6 @@ async function submitManualAddrForLoggedIn(e) {
         selectedAddress={selectedAddress}
         shippingChecked={shippingChecked}
       />
-
-      {/* SIGNUP MODAL */}
-      {showSignup && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <form onSubmit={signupSubmit} className="bg-white p-6 rounded shadow max-w-xl w-full">
-            <h2 className="text-xl font-bold mb-4">Create Account</h2>
-            <div className="grid grid-cols-2 gap-3 text-black">
-
-              <input placeholder="Username" value={signupData.username}
-                onChange={e => signupFieldChange("username", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="Email" value={signupData.email}
-                onChange={e => signupFieldChange("email", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input type="password" placeholder="Password" value={signupData.password}
-                onChange={e => signupFieldChange("password", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="Name" value={signupData.name}
-                onChange={e =>
-                    signupFieldChange(
-                      "name",
-                      e.target.value.replace(/[^A-Za-z\s]/g, "")
-                    )
-                  }
-                className="border p-2 rounded" />
-
-              <input
-                placeholder="Phone"
-                value={signupData.phone}
-                maxLength={10}
-                onChange={e =>
-                  signupFieldChange(
-                    "phone",
-                    e.target.value.replace(/\D/g, "")
-                  )
-                }
-                className="border p-2 rounded"
-              />
-
-              <input placeholder="Address Line 1" value={signupData.line1}
-                onChange={e => signupFieldChange("line1", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="Address Line 2" value={signupData.line2}
-                onChange={e => signupFieldChange("line2", e.target.value)}
-                className="border p-2 rounded" />
-
-              <input placeholder="City" value={signupData.city}
-                onChange={e => signupFieldChange("city", e.target.value)}
-                className="border p-2 rounded" />
-
-              {/* ✅ STATE DROPDOWN */}
-              <div className="col-span-2">
-                <IndiaStateSelect
-                  value={signupData.state}
-                  onChange={(state) => signupFieldChange("state", state)}
-                />
-              </div>
-
-              <input
-                placeholder="Pincode"
-                value={signupData.pincode}
-                maxLength={6}
-                onChange={e =>
-                  signupFieldChange(
-                    "pincode",
-                    e.target.value.replace(/\D/g, "")
-                  )
-                }
-                className="border p-2 rounded"
-              />
-
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4">
-              <button type="button" onClick={() => setShowSignup(false)}>Cancel</button>
-              <button type="submit" className="bg-green-500 text-white px-3 py-1 rounded">{signupLoading ? '...' : 'Sign Up'}</button>
-            </div>
-          </form>
-        </div>
-      )}
 
         {/* GUEST ADDRESS MODAL (shown when Buy Now clicked and user not logged in) */}
         {guestAddrModalOpen && (
