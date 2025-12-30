@@ -828,6 +828,7 @@ async function submitManualAddrForLoggedIn(e) {
       isLoggedIn={isLoggedIn}
       onCartClick={() => setIsCartOpen(true)}
       onMenuOpen={() => setMobileMenuOpen(true)}
+      onLogout={logout}
     />
 
     <MobileDrawer
