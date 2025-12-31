@@ -11,6 +11,7 @@ import './App.css';
 import IndiaStateSelect from "./components/IndiaStateSelect";
 import MobileHeader from "./components/header/MobileHeader";
 import MobileDrawer from "./components/header/MobileDrawer";
+import { FaTimes } from "react-icons/fa";
 import {
   FaUser,
   FaUserPlus,
@@ -1007,8 +1008,26 @@ async function submitManualAddrForLoggedIn(e) {
       {/* ADDRESS SELECTION / MANUAL ENTRY MODAL */}
       {addrModalOpen && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow max-w-lg w-full">
-            <h3 className="text-lg font-bold mb-3">Choose delivery address</h3>
+          <div className="bg-white p-6 rounded shadow max-w-lg w-full relative">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold">Choose delivery address</h3>
+
+              {/* ❌ Close button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAddrModalOpen(false);
+                  setShowAddNewAddr(false); // reset add-new state
+                }}
+                aria-label="Close address popup"
+                className="text-gray-500 hover:text-red-600 transition"
+              >
+                <FaTimes size={18} />
+              </button>
+            </div>
+
 
             {addrLoading && <div>Loading addresses...</div>}
 
@@ -1021,9 +1040,25 @@ async function submitManualAddrForLoggedIn(e) {
                         <div className="font-semibold">
                           {a.name || a.users?.username || `Address ${idx + 1}`}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {a.line1}{a.line2 ? ', ' + a.line2 : ''} • {a.city} • {a.pincode}
-                        </div>
+                       <div className="text-sm text-gray-600 space-y-1">
+                         {/* Address lines */}
+                         <div>
+                           {a.line1}
+                           {a.line2 ? `, ${a.line2}` : ''}
+                         </div>
+
+                         {/* Phone */}
+                         {(a.phone || a.mobile || a.users?.mobile) && (
+                           <div className="text-xs text-gray-700">
+                             📞 {a.phone || a.mobile || a.users?.mobile}
+                           </div>
+                         )}
+                         {/* City + Pincode */}
+                         <div className="text-xs text-gray-500">
+                           {a.city} • {a.pincode}
+                         </div>
+                       </div>
+
                       </div>
                       <button
                         onClick={() => chooseAddrFromList(a)}
