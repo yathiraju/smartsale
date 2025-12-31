@@ -1,8 +1,10 @@
 // src/pages/ShippingPolicy.jsx
+import PageHeader from "../components/PageHeader";
+
 export default function ShippingPolicy() {
   return (
     <div className="max-w-4xl mx-auto p-6 text-gray-800">
-      <h1 className="text-2xl font-bold mb-4">Shipping & Delivery Policy</h1>
+      <PageHeader title="Shipping & Delivery Policy" />
 
       <p className="mb-4">
         SmartSale ships products to locations across India using trusted

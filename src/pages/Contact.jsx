@@ -1,7 +1,9 @@
+import PageHeader from "../components/PageHeader";
+
 export default function Contact() {
   return (
     <div className="max-w-4xl mx-auto p-6 text-gray-800">
-      <h1 className="text-2xl font-bold mb-4">Contact Us</h1>
+      <PageHeader title="Contact Us" />
 
       <p className="mb-6">
         If you have any questions, concerns, or need assistance with your order,

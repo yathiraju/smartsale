@@ -1,8 +1,10 @@
 // src/pages/RefundPolicy.jsx
+import PageHeader from "../components/PageHeader";
+
 export default function RefundPolicy() {
   return (
     <div className="max-w-4xl mx-auto p-6 text-gray-800">
-      <h1 className="text-2xl font-bold mb-4">Refund & Cancellation Policy</h1>
+      <PageHeader title="Refund & Cancellation Policy" />
 
       <p className="mb-4">
         SmartSale believes in helping customers as far as possible and therefore

@@ -22,6 +22,7 @@ export default function Footer() {
             <div className="flex flex-col gap-1">
               <Link to="/terms-and-conditions" className="hover:underline">Terms & Conditions</Link>
               <Link to="/refund-policy" className="hover:underline">Refund Policy</Link>
+              <Link to="/privacyPolicy" className="hover:underline">Privacy Policy</Link>
               <Link to="/shipping-policy" className="hover:underline">Shipping Policy</Link>
             </div>
 

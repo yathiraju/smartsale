@@ -1,8 +1,10 @@
 // src/pages/TermsAndConditions.jsx
+import PageHeader from "../components/PageHeader";
+
 export default function TermsAndConditions() {
   return (
     <div className="max-w-4xl mx-auto p-6 text-gray-800">
-      <h1 className="text-2xl font-bold mb-4">Terms & Conditions</h1>
+      <PageHeader title="Terms & Conditions" />
 
       <p className="mb-4">
         Welcome to SmartSale. By accessing or using our website and services,
