@@ -481,6 +481,8 @@ export default function FlipkartLikeApp() {
 
 
   async function handleBuyNow() {
+      // ✅ CLOSE CART IMMEDIATELY
+        setIsCartOpen(false);
       // if not logged in -> open guest address modal to collect AddressDto-like info
       if (!isLoggedIn) {
         // show the guest address modal
