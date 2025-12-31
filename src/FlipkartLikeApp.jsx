@@ -12,6 +12,7 @@ import IndiaStateSelect from "./components/IndiaStateSelect";
 import MobileHeader from "./components/header/MobileHeader";
 import MobileDrawer from "./components/header/MobileDrawer";
 import { FaTimes } from "react-icons/fa";
+import Footer from "./components/Footer";
 import {
   FaUser,
   FaUserPlus,
@@ -1197,6 +1198,8 @@ async function submitManualAddrForLoggedIn(e) {
           </div>
         </div>
       )}
+  <Footer />
+
     </>
   );
 }
