@@ -71,6 +71,7 @@ export default function FlipkartLikeApp() {
   // address modal UI
   const [addrModalOpen, setAddrModalOpen] = useState(false);
   const [addrChoices, setAddrChoices] = useState([]);
+  const [goToAddresses, setGoToAddresses] = useState(false);
 
   const [addrLoading, setAddrLoading] = useState(false);
 
@@ -525,10 +526,10 @@ export default function FlipkartLikeApp() {
               pincode: '',
               country: 'IN'
             });
-            setAddrModalOpen(true);
+           setGoToAddresses(true);
           } else {
             setAddrChoices(resp);
-            setAddrModalOpen(true);
+            setGoToAddresses(true);
           }
         } else {
           setAddrChoices([]);
@@ -542,7 +543,7 @@ export default function FlipkartLikeApp() {
             pincode: '',
             country: 'IN'
           });
-          setAddrModalOpen(true);
+          setGoToAddresses(true);
         }
       } catch (err) {
         const isCanceled = err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || axios.isCancel?.(err);
@@ -551,13 +552,21 @@ export default function FlipkartLikeApp() {
           alert('Failed to fetch addresses. Please enter address manually.');
           setAddrChoices([]);
          // setManualAddr({ line1: '', pincode: '' });
-          setAddrModalOpen(true);
+          setGoToAddresses(true);
         }
       } finally {
         setAddrLoading(false);
         addrCtrlRef.current = null;
       }
     }
+
+useEffect(() => {
+  if (goToAddresses) {
+    navigate("/addresses");
+    setGoToAddresses(false);
+  }
+}, [goToAddresses, navigate]);
+
 
 // ---------- NEW: submit manual address for logged-in users ----------
 async function submitManualAddrForLoggedIn(e) {
@@ -713,6 +722,7 @@ async function submitManualAddrForLoggedIn(e) {
 
       prevTotalRef.current = totalItems;
     }, [totalItems]);
+
 
   return (
     <>
