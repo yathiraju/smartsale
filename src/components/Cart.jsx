@@ -193,10 +193,27 @@ export default function Cart({
       <div style={{ padding: 16, borderTop: '1px solid #f1f5f9', boxShadow: '0 -6px 12px rgba(0,0,0,0.04)', flexShrink: 0 }}>
         {selectedAddress ? (
           <div style={{ fontSize: 13, marginBottom: 8 }}>
-            Deliver to: <strong>{selectedAddress.line1 || selectedAddress.name || selectedAddress.users?.username}</strong>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>{selectedAddress.city || ''} {selectedAddress.pincode || selectedAddress.pincode}</div>
+            <div>
+              Deliver to:{' '}
+              <strong>
+                {selectedAddress.name || selectedAddress.line1 || selectedAddress.users?.username}
+              </strong>
+            </div>
+
+            {selectedAddress.phone && (
+              <div style={{ fontSize: 12, color: '#374151' }}>
+                📞 {selectedAddress.phone}
+              </div>
+            )}
+
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
+              {(selectedAddress.line1 || '')}
+              {selectedAddress.city ? `, ${selectedAddress.city}` : ''}
+              {selectedAddress.pincode ? ` - ${selectedAddress.pincode}` : ''}
+            </div>
           </div>
         ) : null}
+
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <span style={{ color: '#374151' }}>Subtotal:</span>

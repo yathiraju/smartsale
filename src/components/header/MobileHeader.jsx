@@ -28,7 +28,7 @@ export default function MobileHeader({
       <header className="md:hidden bg-[#232f3e] text-white sticky top-0 z-30 shadow">
 
         {/* TOP BAR */}
-        <div className="flex items-center px-3 py-2 gap-3">
+        <div className="flex items-center px-3 py-2 gap-4">
 
           {/* Hamburger */}
           <button onClick={onMenuOpen} className="text-xl">
