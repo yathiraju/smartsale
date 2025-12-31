@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FaTimes } from "react-icons/fa";
 
 function fmtINR(v, digits = 2) {
   const n = Number(v ?? 0);
@@ -114,7 +115,40 @@ export default function Cart({
   return (
     <Wrapper>
       {/* Header */}
-      <div style={{ padding: 16, borderBottom: '1px solid #f1f5f9', fontWeight: 700, flexShrink: 0 }}>Your Cart</div>
+      <div
+        style={{
+          padding: 16,
+          borderBottom: '1px solid #f1f5f9',
+          fontWeight: 700,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}
+      >
+        <span>Your Cart</span>
+
+        {/* ❌ Close button */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close cart"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#374151',
+            transition: 'color 0.2s'
+          }}
+        >
+          <FaTimes size={18} />
+        </button>
+      </div>
+
 
       {/* Items */}
       <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
