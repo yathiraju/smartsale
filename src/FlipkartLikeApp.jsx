@@ -63,6 +63,10 @@ export default function FlipkartLikeApp() {
   });
   const [showAddNewAddr, setShowAddNewAddr] = useState(false);
   const [manualAddrSubmitting, setManualAddrSubmitting] = useState(false);
+
+  // Inline validation errors
+  const [guestErrors, setGuestErrors] = useState({});
+  const [manualErrors, setManualErrors] = useState({});
   // ---------- end NEW state ----------
 
   // NEW: address & shipping state
@@ -334,6 +338,21 @@ export default function FlipkartLikeApp() {
       country
     };
   }
+
+  function validateAddress(addr, isValidPhone, isValidPincode) {
+    const errors = {};
+
+    if (!addr.name?.trim()) errors.name = "Name is required";
+    if (!isValidPhone(addr.phone)) errors.phone = "Enter valid 10-digit phone number";
+    if (!addr.addressLine1?.trim()) errors.addressLine1 = "Address line 1 is required";
+    if (!addr.city?.trim()) errors.city = "City is required";
+    if (!addr.state?.trim()) errors.state = "State is required";
+    if (!isValidPincode(addr.pincode)) errors.pincode = "Enter valid 6-digit pincode";
+    if (!addr.country?.trim()) errors.country = "Country is required";
+
+    return errors;
+  }
+
   // ---------- end helper ----------
 
   // ---------- replaced pay() with capture including deliveryAddress ----------
@@ -436,50 +455,36 @@ export default function FlipkartLikeApp() {
   // ---------- end pay() ------
 
   async function submitGuestAddress(e) {
-      if (e && e.preventDefault) e.preventDefault();
-      if (guestAddrSubmitting) return;
+    e.preventDefault();
+    if (guestAddrSubmitting) return;
 
-      // validation (mirror AddressDto constraints)
-      const { name, phone, addressLine1, city, state, pincode, country } = guestAddress;
-      if (!String(name || '').trim()) return alert('Name is required');
-      if (!isValidPhone(phone)) return alert('Phone must be a 10-digit number');
-      if (!String(addressLine1 || '').trim()) return alert('Address line1 is required');
-      if (!String(city || '').trim()) return alert('City is required');
-      if (!String(state || '').trim()) return alert('State is required');
-      if (!isValidPincode(pincode)) return alert('Pincode must be a 6-digit number');
-      if (!String(country || '').trim()) return alert('Country is required');
+    const errors = validateAddress(guestAddress, isValidPhone, isValidPincode);
+    setGuestErrors(errors);
 
-      setGuestAddrSubmitting(true);
+    if (Object.keys(errors).length > 0) return;
 
-      try {
-        // normalize to the shape expected by onAddressChosen (it reads pincode and line1)
-        const addr = {
-          name: guestAddress.name,
-          phone: guestAddress.phone,
-          line1: guestAddress.addressLine1,
-          line2: guestAddress.addressLine2,
-          city: guestAddress.city,
-          state: guestAddress.state,
-          pincode: guestAddress.pincode,
-          country: guestAddress.country
-        };
+    setGuestAddrSubmitting(true);
+    try {
+      const addr = {
+        name: guestAddress.name,
+        phone: guestAddress.phone,
+        line1: guestAddress.addressLine1,
+        line2: guestAddress.addressLine2,
+        city: guestAddress.city,
+        state: guestAddress.state,
+        pincode: guestAddress.pincode,
+        country: guestAddress.country
+      };
 
-        // Save guest address in its own state variable (user requested)
-        setGuestAddress(addr);
+      setGuestAddress(addr);
+      setGuestAddrModalOpen(false);
+      await onAddressChosen(addr);
 
-        // Close modal and reuse existing flow: call onAddressChosen to perform shipping check + continue
-        setGuestAddrModalOpen(false);
-
-        // call same logic that handles shipping (onAddressChosen does shipping check and opens cart)
-        await onAddressChosen(addr);
-
-      } catch (err) {
-        console.error('Guest address submit failed', err);
-        alert('Failed to check shipping for this address. Please try again.');
-      } finally {
-        setGuestAddrSubmitting(false);
-      }
+    } finally {
+      setGuestAddrSubmitting(false);
     }
+  }
+
 
 
   async function handleBuyNow() {
@@ -565,18 +570,13 @@ export default function FlipkartLikeApp() {
 
 // ---------- NEW: submit manual address for logged-in users ----------
 async function submitManualAddrForLoggedIn(e) {
-  if (e && e.preventDefault) e.preventDefault();
+  e.preventDefault();
   if (manualAddrSubmitting) return;
 
-  // mirror same validations as guest
-  const { name, phone, addressLine1, city, state, pincode, country } = manualAddrFull;
-  if (!String(name || '').trim()) return alert('Name is required');
-  if (!isValidPhone(phone)) return alert('Phone must be a 10-digit number');
-  if (!String(addressLine1 || '').trim()) return alert('Address line1 is required');
-  if (!String(city || '').trim()) return alert('City is required');
-  if (!String(state || '').trim()) return alert('State is required');
-  if (!isValidPincode(pincode)) return alert('Pincode must be a 6-digit number');
-  if (!String(country || '').trim()) return alert('Country is required');
+  const errors = validateAddress(manualAddrFull, isValidPhone, isValidPincode);
+  setManualErrors(errors);
+
+  if (Object.keys(errors).length > 0) return;
 
   setManualAddrSubmitting(true);
   try {
@@ -591,18 +591,13 @@ async function submitManualAddrForLoggedIn(e) {
       country: manualAddrFull.country
     };
 
-    // close modal and use same shipping logic
     setAddrModalOpen(false);
-
-    // reuse the shipping check / onAddressChosen flow
     await onAddressChosen(addr);
-  } catch (err) {
-    console.error('submit manual addr failed', err);
-    alert('Failed to check shipping for this address. Please try again.');
   } finally {
     setManualAddrSubmitting(false);
   }
 }
+
 // ---------- end NEW ----------
 
 
@@ -982,18 +977,53 @@ async function submitManualAddrForLoggedIn(e) {
               <h2 className="text-xl font-bold mb-3">Enter delivery address</h2>
 
               <div className="grid grid-cols-1 gap-2 text-black">
-                <input placeholder="Name" value={guestAddress.name} onChange={e => setGuestAddress(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z\s]/g, "") }))} className="border p-2 rounded" />
-                <input placeholder="Phone (10 digits)" value={guestAddress.phone} maxLength={10} onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, "") }))} className="border p-2 rounded" />
-                <input placeholder="Address line 1" value={guestAddress.addressLine1} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
-                <input placeholder="Address line 2 (optional)" value={guestAddress.addressLine2} onChange={e => setGuestAddress(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
-                <input placeholder="City" value={guestAddress.city} onChange={e => setGuestAddress(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
-                                <div className="w-full"><IndiaStateSelect
+                <input
+                  placeholder="Name"
+                  value={guestAddress.name}
+                  onChange={e => {
+                    setGuestAddress(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z\s]/g, "") }));
+                    setGuestErrors(prev => ({ ...prev, name: "" }));
+                  }}
+                  className={`border p-2 rounded ${guestErrors.name ? "border-red-500" : ""}`}
+                />
+                {guestErrors.name && <p className="text-red-600 text-xs">{guestErrors.name}</p>}
+                <input placeholder="Phone (10 digits)" value={guestAddress.phone} maxLength={10} onChange={e => {
+                    setGuestAddress(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, "") }));
+                    setGuestErrors(prev => ({ ...prev, phone: "" }));
+                    }}
+                 className={`border p-2 rounded ${guestErrors.phone ? "border-red-500" : ""}`}
+                 />
+                 {guestErrors.phone && <p className="text-red-600 text-xs">{guestErrors.phone}</p>}
+                <input placeholder="Address line 1" value={guestAddress.addressLine1} onChange={e => {
+                    setGuestAddress(prev => ({ ...prev, addressLine1: e.target.value }));
+                    setGuestErrors(prev => ({ ...prev, addressLine1: "" }));
+                    }}
+                className={`border p-2 rounded ${guestErrors.addressLine1 ? "border-red-500" : ""}`}
+                 />
+                  {guestErrors.addressLine1 && <p className="text-red-600 text-xs">{guestErrors.addressLine1}</p>}
+                <input placeholder="Address line 2 (optional)" value={guestAddress.addressLine2} onChange={e =>
+                    setGuestAddress(prev => ({ ...prev, addressLine2: e.target.value }))
+                } className="border p-2 rounded" />
+                <input placeholder="City" value={guestAddress.city} onChange={e => {
+                    setGuestAddress(prev => ({ ...prev, city: e.target.value }));
+                    setGuestErrors(prev => ({ ...prev, city: "" }));
+                    }}
+                className={`border p-2 rounded ${guestErrors.city ? "border-red-500" : ""}`}
+                  />
+                 {guestErrors.city && <p className="text-red-600 text-xs">{guestErrors.city}</p>}
+                <div className="w-full"><IndiaStateSelect
                                   value={guestAddress.state}
                                   onChange={(state) =>
                                     setGuestAddress(prev => ({ ...prev, state }))
                                   }
                                 /></div>
-                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} maxLength={6} onChange={e => setGuestAddress(prev => ({ ...prev, pincode: e.target.value.replace(/\D/g, "") }))} className="border p-2 rounded" />
+                <input placeholder="Pincode (6 digits)" value={guestAddress.pincode} maxLength={6} onChange={e => {
+                    setGuestAddress(prev => ({ ...prev, pincode: e.target.value.replace(/\D/g, "") }));
+                    setGuestErrors(prev => ({ ...prev, pincode: "" }));
+                    }}
+                className={`border p-2 rounded ${guestErrors.pincode ? "border-red-500" : ""}`}
+                 />
+                {guestErrors.pincode && <p className="text-red-600 text-xs">{guestErrors.pincode}</p>}
                 <input placeholder="Country" value={guestAddress.country} onChange={e => setGuestAddress(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
               </div>
 
@@ -1091,7 +1121,9 @@ async function submitManualAddrForLoggedIn(e) {
                     onChange={e => setManualAddrFull(prev => ({ ...prev, name: e.target.value }))}
                     className="border p-2 rounded"
                   />
-
+                  {manualErrors.name && (
+                                       <p className="text-red-600 text-xs">{manualErrors.name}</p>
+                   )}
                   <input
                     placeholder="Phone (10 digits)"
                     value={manualAddrFull.phone}
@@ -1102,6 +1134,9 @@ async function submitManualAddrForLoggedIn(e) {
                     }))}
                     className="border p-2 rounded"
                   />
+                  {manualErrors.phone && (
+                     <p className="text-red-600 text-xs">{manualErrors.phone}</p>
+                  )}
 
                   <input
                     placeholder="Address line 1"
@@ -1109,6 +1144,9 @@ async function submitManualAddrForLoggedIn(e) {
                     onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine1: e.target.value }))}
                     className="border p-2 rounded"
                   />
+                  {manualErrors.addressLine1 && (
+                                      <p className="text-red-600 text-xs">{manualErrors.addressLine1}</p>
+                  )}
 
                   <input
                     placeholder="Address line 2 (optional)"
@@ -1143,6 +1181,9 @@ async function submitManualAddrForLoggedIn(e) {
                     }
                     className="border p-2 rounded"
                   />
+                  {manualErrors.pincode && (
+                    <p className="text-red-600 text-xs">{manualErrors.pincode}</p>
+                  )}
 
                   <div className="flex justify-between mt-3">
                     <button

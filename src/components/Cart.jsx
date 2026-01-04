@@ -225,7 +225,7 @@ export default function Cart({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ color: '#374151' }}>Delivery:</span>
+          <span style={{ color: '#374151' }}>Delivery(NR):</span>
           <strong>₹{fmtINR(Number(deliveryFee || 0))}</strong>
         </div>
 
