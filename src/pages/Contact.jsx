@@ -34,10 +34,10 @@ export default function Contact() {
           <h2 className="font-semibold">Email</h2>
           <p>
             <a
-              href="mailto:support@smartsales.in"
+              href="mailto:support@smart-sales.in"
               className="text-blue-600 hover:underline"
             >
-              support@smartsales.in
+              support@smart-sales.in
             </a>
           </p>
         </div>
