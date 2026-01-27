@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { getApiHost } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey,setRefreshKey] = useState(0);
+  const navigate = useNavigate();
 
   const username = localStorage.getItem('rzp_username');
 
@@ -104,11 +106,24 @@ useEffect(() => {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">My Orders</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">My Orders</h1>
+
+        <button
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm"
+        >
+          ← Back
+        </button>
+      </div>
+
 
       {orders.length === 0 && (
-        <div className="text-gray-500">No orders found</div>
+        <div className="text-center text-gray-500 mt-12">
+          <div className="text-lg mb-4">No orders found</div>
+        </div>
       )}
+
 
       <div className="space-y-6">
         {orders.map(order => (
