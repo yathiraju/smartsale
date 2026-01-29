@@ -65,6 +65,20 @@ export const api = {
   createPaymentOrder: (payload) => _fetch('/api/orders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) }),
   capturePayment: (payload) => _fetch('/api/payments/capture', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) }),
 
+  sendOtp: (phone) =>
+    _fetch('/api/auth/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    }),
+
+  verifyOtp: (phone, requestId, otp) =>
+    _fetch('/api/auth/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, requestId, otp })
+    }),
+
   // Signup: expects payload matching UserAddressDTO
   // {
   //   users: { username, password, email, role },
