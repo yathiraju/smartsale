@@ -30,7 +30,7 @@ export default function Login() {
     // normalize phone (India)
 
       if (phone.startsWith('91')) {
-        phone =  phone;
+
       } else {
         phone = '91' + phone;
       }
@@ -67,13 +67,13 @@ export default function Login() {
       return;
     }
 
-    if (!phone.startsWith('+')) {
-      if (phone.startsWith('91')) {
-        phone = '+' + phone;
+
+      if (phone.startsWith('91') ) {
+
       } else {
-        phone = '+91' + phone;
+        phone = '91' + phone;
       }
-    }
+
 
     try {
       setLoading(true);
@@ -86,6 +86,7 @@ export default function Login() {
       // If your backend returns token later, use it here
       // For now, just store phone as user
       setUser(phone);
+      setToken(res.token);
       localStorage.setItem('rzp_username', phone);
 
       navigate('/');
