@@ -780,10 +780,10 @@ async function submitManualAddrForLoggedIn(e) {
                     {/* Login */}
                     <button
                       onClick={() => navigate("/login")}
-                      className="h-10 px-4 bg-white text-blue-600 rounded hover:bg-gray-100 border flex items-center justify-center"
-                      title="Login"
+                      className="flex flex-col items-center justify-center text-white hover:text-yellow-300"
                     >
-                      <FaUser size={18} />
+                      <FaUser size={20} />
+                      <span className="text-xs leading-none mt-1">Login</span>
                     </button>
 
                   </div>
@@ -795,12 +795,16 @@ async function submitManualAddrForLoggedIn(e) {
 
                     <button
                       onClick={() => setProfileOpen(prev => !prev)}
-                      className="h-10 px-3 bg-white text-blue-600 rounded flex items-center gap-1 shadow"
+                      className="flex flex-col items-center justify-center text-white hover:text-yellow-300"
                     >
                       <FaUserCircle size={22} />
-                      <FaChevronDown
-                        className={`transition-transform ${profileOpen ? "rotate-180" : ""}`}
-                      />
+                      <div className="flex items-center gap-1 text-xs leading-none mt-1">
+                        <span>Account</span>
+                        <FaChevronDown
+                          className={`transition-transform ${profileOpen ? "rotate-180" : ""}`}
+                          size={10}
+                        />
+                      </div>
                     </button>
 
                     {profileOpen && (
@@ -841,16 +845,18 @@ async function submitManualAddrForLoggedIn(e) {
                 <div className="flex-none">
                   <button
                     onClick={() => setIsCartOpen(true)}
-                    className="relative h-10 bg-white text-blue-600 px-3 rounded flex items-center"
+                    className="relative flex flex-col items-center justify-center text-white hover:text-yellow-300"
                   >
-                    <FaShoppingCart size={18} />
+                    <FaShoppingCart size={20} />
+
+                    <span className="text-xs leading-none mt-1">Cart</span>
 
                     {totalItems > 0 && (
                       <span
                         className={`
-                          absolute -top-1 -right-1
+                          absolute -top-1 right-0
                           bg-red-600 text-white
-                          text-xs font-bold
+                          text-[10px] font-bold
                           rounded-full
                           min-w-[18px] h-[18px]
                           flex items-center justify-center
