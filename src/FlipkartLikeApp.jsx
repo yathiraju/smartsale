@@ -15,7 +15,6 @@ import { FaTimes } from "react-icons/fa";
 import Footer from "./components/Footer";
 import {
   FaUser,
-  FaUserPlus,
   FaUserCircle,
   FaShoppingCart,
   FaSearch,
@@ -785,15 +784,6 @@ async function submitManualAddrForLoggedIn(e) {
                       title="Login"
                     >
                       <FaUser size={18} />
-                    </button>
-
-                    {/* Sign Up */}
-                    <button
-                      onClick={() => navigate("/signup")}
-                      className="h-10 px-4 bg-yellow-400 text-black rounded hover:bg-yellow-300 flex items-center justify-center"
-                      title="Sign Up"
-                    >
-                      <FaUserPlus size={18} />
                     </button>
 
                   </div>
