@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import {
   FaUser,
-  FaUserPlus,
   FaUserCircle,
   FaShoppingCart,
   FaSearch,
@@ -43,33 +42,43 @@ export default function MobileHeader({
           />
 
           {/* Right actions */}
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-5">
 
             {/* NOT LOGGED IN */}
             {!isLoggedIn && (
               <>
-                <button onClick={() => navigate("/login")}>
-                  <FaUser size={18} />
-                </button>
-
-                 <button onClick={() => navigate("/signup")}>
-                  <FaUserPlus size={18} />
-                </button>
+                <button
+                    onClick={() => navigate("/login")}
+                    className="flex flex-col items-center text-xs"
+                  >
+                    <FaUser size={18} />
+                    <span className="text-[10px] leading-none mt-1">Login</span>
+                  </button>
               </>
             )}
 
             {/* LOGGED IN */}
             {isLoggedIn && (
-              <button onClick={() => setProfileOpen(true)}>
-                <FaUserCircle size={20} />
-              </button>
+              <button
+                  onClick={() => setProfileOpen(true)}
+                  className="flex flex-col items-center text-xs"
+                >
+                  <FaUserCircle size={20} />
+                  <span className="text-[10px] leading-none mt-1">Account</span>
+                </button>
             )}
 
             {/* Cart */}
-            <button onClick={onCartClick} className="relative">
+            <button
+              onClick={onCartClick}
+              className="relative flex flex-col items-center text-xs"
+            >
               <FaShoppingCart size={18} />
+
+              <span className="text-[10px] leading-none mt-1">Cart</span>
+
               {totalItems > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full px-1">
+                <span className="absolute -top-1 right-1 bg-red-600 text-[9px] rounded-full px-1">
                   {totalItems > 99 ? "99+" : totalItems}
                 </span>
               )}
