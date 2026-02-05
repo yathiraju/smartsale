@@ -36,25 +36,42 @@ export function generateSecureId() {
 export function setSavedCartId(id){ if(id){ localStorage.setItem(STORAGE_KEYS.CART_ID, id); } else { localStorage.removeItem(STORAGE_KEYS.CART_ID); } }
 export function getSavedCartId(){ return localStorage.getItem(STORAGE_KEYS.CART_ID); }
 
-async function _fetch(path, opts = {}){
+async function _fetch(path, opts = {}) {
   const host = getApiHost().replace(/\/$/, '');
   const url = host + path;
-  const headers = Object.assign({}, opts.headers || {});
+
+  const { headers: customHeaders = {}, signal, ...rest } = opts;
+
+  const headers = { ...customHeaders };
   const token = getToken();
-  if(token) headers['Authorization'] = 'Bearer ' + token;
-  // Ensure mode: 'cors' is present if you need cross-origin requests
-  const res = await fetch(url, { ...opts, headers, mode: 'cors' });
-  const text = await res.text();
-  try{
-    const json = JSON.parse(text);
-    if (!res.ok) throw json; // throw parsed json for error handling upstream
-    return json;
-  } catch(e){
-    // If parse failed, return raw text for ok responses, or throw for non-ok
-    if (!res.ok) throw text;
-    try { return JSON.parse(text); } catch(_) { return text; }
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  const res = await fetch(url, {
+    ...rest,
+    headers,
+    signal,
+    mode: 'cors'
+  });
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {}
+
+  if (!res.ok) {
+    const err = new Error(
+      data?.message || `HTTP ${res.status}`
+    );
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
+
+  return data;
 }
+
+
+
 
 export const api = {
   login: (username, password) => _fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username, password }) }),
@@ -65,18 +82,20 @@ export const api = {
   createPaymentOrder: (payload) => _fetch('/api/orders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) }),
   capturePayment: (payload) => _fetch('/api/payments/capture', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) }),
 
-  sendOtp: (phone) =>
+  sendOtp: (phone, opts = {}) =>
     _fetch('/api/auth/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone })
+      body: JSON.stringify({ phone }),
+      ...opts            // ✅ allows signal
     }),
 
-  verifyOtp: (phone, requestId, otp) =>
+  verifyOtp: (phone, requestId, otp, opts = {}) =>
     _fetch('/api/auth/otp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, requestId, otp })
+      body: JSON.stringify({ phone, requestId, otp }),
+      ...opts            // ✅ allows signal
     }),
 
   // Signup: expects payload matching UserAddressDTO

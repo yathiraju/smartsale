@@ -1,156 +1,153 @@
-import React, { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api, setToken, setUser } from '../services/api';
+import React, { useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, setToken, setUser } from "../services/api";
+import { useOtpAuth } from "../hooks/useOtpAuth";
 
 export default function Login() {
   const phoneRef = useRef(null);
   const otpRef = useRef(null);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [step, setStep] = useState(1); // 1 = enter phone, 2 = enter otp
-  const [requestId, setRequestId] = useState(null);
-
   const navigate = useNavigate();
 
-  // STEP 1: Send OTP
-  async function handleSendOtp(e) {
+  const {
+    step,        // "PHONE" | "OTP"
+    loading,
+    error,
+    expiresIn,
+    sendOtp,
+    verifyOtp,
+    reset,
+  } = useOtpAuth(api);
+
+  // ---------- Validation helpers ----------
+  const validatePhone = (phone) => {
+    if (!phone) return "Mobile number is required";
+    if (!/^[6-9]\d{9}$/.test(phone))
+      return "Enter a valid 10-digit mobile number";
+    return null;
+  };
+
+  const validateOtp = (otp) => {
+    if (!otp) return "OTP is required";
+    if (!/^\d{6}$/.test(otp))
+      return "OTP must be 6 digits";
+    return null;
+  };
+
+  // ---------- Submit handler ----------
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (loading) return;
 
-    setError('');
+    const phone = phoneRef.current?.value?.trim();
+    const otp = otpRef.current?.value?.trim();
 
-    let phone = phoneRef.current.value.trim();
+    // STEP 1: Send OTP
+    if (step === "PHONE") {
+      const phoneError = validatePhone(phone);
+      if (phoneError) {
+        reset(phoneError);
+        return;
+      }
 
-    if (!phone) {
-      setError('Please enter mobile number');
+      try {
+        await sendOtp(phone);
+      } catch {
+        // error handled by hook
+      }
       return;
     }
 
-    // normalize phone (India)
-
-      if (phone.startsWith('91')) {
-
-      } else {
-        phone = '91' + phone;
+    // STEP 2: Verify OTP
+    if (step === "OTP") {
+      const otpError = validateOtp(otp);
+      if (otpError) {
+        reset(otpError);
+        return;
       }
 
+      try {
+        const res = await verifyOtp(phone, otp);
 
-    try {
-      setLoading(true);
-      const res = await api.sendOtp(phone);
+        if (!res || !res.success) {
+          reset("Invalid OTP. Please try again.");
+          return;
+        }
 
-      if (!res?.requestId) throw new Error('Invalid response from server');
+        if (res.token) {
+          setToken(res.token);
+        }
 
-      setRequestId(res.requestId);
-      setStep(2); // move to OTP screen
-    } catch (err) {
-      console.error(err);
-      setError('Failed to send OTP. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
+        setUser(phone);
 
-  // STEP 2: Verify OTP
-  async function handleVerifyOtp(e) {
-    e.preventDefault();
-    if (loading) return;
-
-    setError('');
-
-    const otp = otpRef.current.value.trim();
-    let phone = phoneRef.current.value.trim();
-
-    if (!otp) {
-      setError('Please enter OTP');
-      return;
-    }
-
-
-      if (phone.startsWith('91') ) {
-
-      } else {
-        phone = '91' + phone;
+        // allow response flush before navigation
+        setTimeout(() => {
+          navigate("/");
+        }, 0);
+      } catch {
+        // error handled by hook
       }
-
-
-    try {
-      setLoading(true);
-      const res = await api.verifyOtp(phone, requestId, otp);
-
-      if (!res?.success) {
-        throw new Error('OTP verification failed');
-      }
-
-      // If your backend returns token later, use it here
-      // For now, just store phone as user
-      setUser(phone);
-      setToken(res.token);
-      localStorage.setItem('rzp_username', phone);
-
-      navigate('/');
-    } catch (err) {
-      console.error(err);
-      setError('Invalid OTP or OTP expired');
-    } finally {
-      setLoading(false);
     }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <form
-        onSubmit={step === 1 ? handleSendOtp : handleVerifyOtp}
+        onSubmit={handleSubmit}
         className="bg-white p-6 rounded shadow max-w-md w-full"
       >
         <h2 className="text-2xl font-bold mb-4 text-center">
-          {step === 1 ? 'Login with Mobile' : 'Enter OTP'}
+          {step === "PHONE" ? "Login with Mobile" : "Enter OTP"}
         </h2>
 
-        {/* Error Message */}
+        {/* Error */}
         {error && (
-          <div className="mb-4 p-2 text-red-700 bg-red-100 border border-red-300 rounded text-sm">
+          <div className="mb-4 p-3 text-red-700 bg-red-100 border border-red-300 rounded text-sm">
             {error}
           </div>
         )}
 
-        {/* Phone Input */}
+        {/* Phone */}
         <input
           ref={phoneRef}
+          type="tel"
           placeholder="Enter mobile number"
-          className="border p-2 rounded w-full mb-3"
-          disabled={step === 2}
+          disabled={step === "OTP"}
+          className="border p-2 rounded w-full mb-3 disabled:bg-gray-100"
         />
 
-        {/* OTP Input */}
-        {step === 2 && (
-          <input
-            ref={otpRef}
-            placeholder="Enter 6 digit OTP"
-            className="border p-2 rounded w-full mb-4"
-          />
+        {/* OTP */}
+        {step === "OTP" && (
+          <>
+            <input
+              ref={otpRef}
+              type="number"
+              placeholder="Enter 6 digit OTP"
+              className="border p-2 rounded w-full mb-2"
+            />
+
+            {expiresIn > 0 && (
+              <div className="text-xs text-gray-600 mb-2">
+                OTP expires in <b>{expiresIn}s</b>
+              </div>
+            )}
+          </>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50"
         >
           {loading
-            ? 'Please wait...'
-            : step === 1
-            ? 'Send OTP'
-            : 'Verify OTP'}
+            ? "Please wait..."
+            : step === "PHONE"
+            ? "Send OTP"
+            : "Verify OTP"}
         </button>
 
-        {step === 2 && (
+        {step === "OTP" && (
           <button
             type="button"
-            onClick={() => {
-              setStep(1);
-              setRequestId(null);
-            }}
+            onClick={() => reset()}
             className="w-full mt-3 text-sm text-gray-600 hover:underline"
           >
             ← Change mobile number
