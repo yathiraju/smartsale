@@ -541,8 +541,8 @@ export default function FlipkartLikeApp() {
         } else {
           setAddrChoices([]);
           setManualAddrFull({
-            name: usernameDisplay || '',
-            phone: '',
+            name:  '',
+            phone: usernameDisplay || '',
             addressLine1: '',
             addressLine2: '',
             city: '',
@@ -1208,8 +1208,17 @@ async function submitManualAddrForLoggedIn(e) {
 
                 <form onSubmit={submitManualAddrForLoggedIn} className="grid grid-cols-1 gap-2">
                   <input placeholder="Name" value={manualAddrFull.name} onChange={e => setManualAddrFull(prev => ({ ...prev, name: e.target.value }))} className="border p-2 rounded" />
+                  {manualErrors.name && (
+                                                         <p className="text-red-600 text-xs">{manualErrors.name}</p>
+                                     )}
                   <input placeholder="Phone (10 digits)" value={manualAddrFull.phone} onChange={e => setManualAddrFull(prev => ({ ...prev, phone: e.target.value }))} className="border p-2 rounded" />
+                  {manualErrors.phone && (
+                                       <p className="text-red-600 text-xs">{manualErrors.phone}</p>
+                                    )}
                   <input placeholder="Address line 1" value={manualAddrFull.addressLine1} onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine1: e.target.value }))} className="border p-2 rounded" />
+                  {manualErrors.addressLine1 && (
+                                                        <p className="text-red-600 text-xs">{manualErrors.addressLine1}</p>
+                                    )}
                   <input placeholder="Address line 2 (optional)" value={manualAddrFull.addressLine2} onChange={e => setManualAddrFull(prev => ({ ...prev, addressLine2: e.target.value }))} className="border p-2 rounded" />
                   <input placeholder="City" value={manualAddrFull.city} onChange={e => setManualAddrFull(prev => ({ ...prev, city: e.target.value }))} className="border p-2 rounded" />
                                     <div className="w-full"><IndiaStateSelect
@@ -1219,6 +1228,9 @@ async function submitManualAddrForLoggedIn(e) {
                                       }
                                     /></div>
                   <input placeholder="Pincode (6 digits)" value={manualAddrFull.pincode} onChange={e => setManualAddrFull(prev => ({ ...prev, pincode: e.target.value }))} className="border p-2 rounded" />
+                  {manualErrors.pincode && (
+                                      <p className="text-red-600 text-xs">{manualErrors.pincode}</p>
+                                    )}
                   <input placeholder="Country" value={manualAddrFull.country} onChange={e => setManualAddrFull(prev => ({ ...prev, country: e.target.value }))} className="border p-2 rounded" />
 
                   <div className="flex justify-end gap-2 mt-3">
