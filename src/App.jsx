@@ -9,6 +9,8 @@ import RefundPolicy from "./pages/RefundPolicy";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import Contact from "./pages/Contact";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import OrderSuccess from "./pages/OrderSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 
 export default function App() {
   return (
@@ -22,6 +24,8 @@ export default function App() {
       <Route path="/shipping-policy" element={<ShippingPolicy />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/privacyPolicy" element={<PrivacyPolicy />} />
+      <Route path="/order-success" element={<OrderSuccess />} />
+      <Route path="/payment-failed" element={<PaymentFailed />} />
     </Routes>
   );
 }

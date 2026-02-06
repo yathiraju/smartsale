@@ -190,7 +190,7 @@ useEffect(() => {
 
             {/* ACTIONS */}
             <div className="mt-4 flex justify-end">
-              {order.status === 'CONFIRMED' &&
+              {order.status === 'FULFILLED' &&
               isRefundAllowed(order.createdAt) ? (
                 <button
                   onClick={() => refundOrder(order)}
