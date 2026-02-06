@@ -437,25 +437,52 @@ export default function FlipkartLikeApp() {
                   }
                 });
             } else {
-              alert('Payment failed');
+              navigate("/payment-failed", {
+                replace: true,
+                state: {
+                  orderId: appId,
+                  reason: "Payment verification failed"
+                }
+              });
+
             }
           } catch (e) {
-            console.error(e);
-            alert('Payment failed');
+            navigate("/payment-failed", {
+              replace: true,
+              state: {
+                orderId: appId,
+                reason: "Payment verification failed"
+              }
+            });
+
           }
         }
       });
 
       rzp.on('payment.failed', (err) => {
         console.error(err);
-        alert('Payment failed: ' + err.error.description);
+
+        navigate("/payment-failed", {
+          replace: true,
+          state: {
+            orderId: appId,
+            reason: err?.error?.description || "Transaction was cancelled or failed"
+          }
+        });
       });
+
 
       rzp.open();
 
     } catch (e) {
-      console.error(e);
-      alert('Payment flow failed: ' + (e.message || e));
+      navigate("/payment-failed", {
+        replace: true,
+        state: {
+          orderId: "N/A",
+          reason: "Payment verification failed"
+        }
+      });
+
     } finally {
       setPaying(false);
     }
