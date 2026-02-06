@@ -102,11 +102,11 @@ export default function FlipkartLikeApp() {
   // ----------------------------
   // image URL helper (stable)
   // ----------------------------
-  const imageUrlForSku = useCallback((sku, ext = 'png') => {
-    if (!sku) return '/placeholder.png';
+  const imageUrlForSku = useCallback((sku, ext = 'webp') => {
+    if (!sku) return '/placeholder.webp';
     const repoUser = 'yathiraju';
     const repo = 'smartsale-images';
-    const version = 'test';
+    const version = 'main';
     return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
   }, []);
 
