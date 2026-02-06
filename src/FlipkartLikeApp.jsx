@@ -28,6 +28,7 @@ export default function FlipkartLikeApp() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const [cart, setCart] = useState({});
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -691,7 +692,10 @@ async function submitManualAddrForLoggedIn(e) {
   // Initial fetch on mount
   // ----------------------------
   useEffect(() => {
-    fetchProducts({ q: search, p: page, s: size, sortBy: sort });
+    (async () => {
+      await fetchProducts({ q: search, p: page, s: size, sortBy: sort });
+      setInitialLoading(false); // 👈 hide splash AFTER first load
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
 
@@ -717,6 +721,33 @@ async function submitManualAddrForLoggedIn(e) {
 
       prevTotalRef.current = totalItems;
     }, [totalItems]);
+
+if (initialLoading) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "black",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999
+      }}
+    >
+      <img
+        src="/smartsales_logo.png"
+        alt="SmartSales"
+        style={{ width: 180, marginBottom: 20 }}
+      />
+      <div className="animate-pulse text-gray-500">
+        Loading SmartSales…
+      </div>
+    </div>
+  );
+}
+
 
   return (
     <>
