@@ -284,7 +284,7 @@ export default function FlipkartLikeApp() {
       }));
       if (items.length === 0) return null;
 
-      const username = localStorage.getItem('rzp_username');
+      const username = '91' + localStorage.getItem('rzp_username');
       const payload = { username, sessionId: getSession(), items };
 
       const res = await api.saveCart(payload);
@@ -424,9 +424,15 @@ export default function FlipkartLikeApp() {
 
             // your backend currently inspects providerOrderId/paymentId and calls paymentService.markSuccess(...)
             if (cap && String(cap.status).toLowerCase() === 'paid') {
-              alert('Order Placed successful');
               clearCart();
               setIsCartOpen(false);
+              // ✅ Redirect to Orders page
+                navigate("/orders", {
+                  replace: true,
+                  state: {
+                    orderId: appId
+                  }
+                });
             } else {
               alert('Payment failed');
             }
