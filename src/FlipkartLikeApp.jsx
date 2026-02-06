@@ -28,6 +28,7 @@ export default function FlipkartLikeApp() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const [cart, setCart] = useState({});
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -101,11 +102,11 @@ export default function FlipkartLikeApp() {
   // ----------------------------
   // image URL helper (stable)
   // ----------------------------
-  const imageUrlForSku = useCallback((sku, ext = 'png') => {
-    if (!sku) return '/placeholder.png';
+  const imageUrlForSku = useCallback((sku, ext = 'webp') => {
+    if (!sku) return '/placeholder.webp';
     const repoUser = 'yathiraju';
     const repo = 'smartsale-images';
-    const version = 'test';
+    const version = 'main';
     return `https://cdn.jsdelivr.net/gh/${repoUser}/${repo}@${version}/products/${encodeURIComponent(sku)}.${ext}`;
   }, []);
 
@@ -284,7 +285,7 @@ export default function FlipkartLikeApp() {
       }));
       if (items.length === 0) return null;
 
-      const username = localStorage.getItem('rzp_username');
+      const username = '91' + localStorage.getItem('rzp_username');
       const payload = { username, sessionId: getSession(), items };
 
       const res = await api.saveCart(payload);
@@ -424,9 +425,15 @@ export default function FlipkartLikeApp() {
 
             // your backend currently inspects providerOrderId/paymentId and calls paymentService.markSuccess(...)
             if (cap && String(cap.status).toLowerCase() === 'paid') {
-              alert('Order Placed successful');
               clearCart();
               setIsCartOpen(false);
+              // ✅ Redirect to Orders page
+                navigate("/orders", {
+                  replace: true,
+                  state: {
+                    orderId: appId
+                  }
+                });
             } else {
               alert('Payment failed');
             }
@@ -685,7 +692,10 @@ async function submitManualAddrForLoggedIn(e) {
   // Initial fetch on mount
   // ----------------------------
   useEffect(() => {
-    fetchProducts({ q: search, p: page, s: size, sortBy: sort });
+    (async () => {
+      await fetchProducts({ q: search, p: page, s: size, sortBy: sort });
+      setInitialLoading(false); // 👈 hide splash AFTER first load
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
 
@@ -711,6 +721,33 @@ async function submitManualAddrForLoggedIn(e) {
 
       prevTotalRef.current = totalItems;
     }, [totalItems]);
+
+if (initialLoading) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "black",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999
+      }}
+    >
+      <img
+        src="/smartsales_logo.png"
+        alt="SmartSales"
+        style={{ width: 180, marginBottom: 20 }}
+      />
+      <div className="animate-pulse text-gray-500">
+        Loading SmartSales…
+      </div>
+    </div>
+  );
+}
+
 
   return (
     <>
