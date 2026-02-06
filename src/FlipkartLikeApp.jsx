@@ -427,11 +427,13 @@ export default function FlipkartLikeApp() {
             if (cap && String(cap.status).toLowerCase() === 'paid') {
               clearCart();
               setIsCartOpen(false);
-              // ✅ Redirect to Orders page
-                navigate("/orders", {
+              // ✅ Redirect to order-success page
+                navigate("/order-success", {
                   replace: true,
                   state: {
-                    orderId: appId
+                    orderId: appId,
+                    amount: grand,
+                    address: deliveryAddress
                   }
                 });
             } else {
