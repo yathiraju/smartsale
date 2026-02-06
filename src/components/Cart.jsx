@@ -163,7 +163,25 @@ export default function Cart({
 
             return (
               <div key={id} style={{ padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {/* 🖼 Product Image */}
+                  <img
+                    src={p.image || '/placeholder.webp'}
+                    alt={p.name}
+                    loading="lazy"
+                    style={{
+                      width: 64,
+                      height: 64,
+                      objectFit: 'contain',
+                      borderRadius: 6,
+                      border: '1px solid #e5e7eb',
+                      background: '#fff',
+                      flexShrink: 0
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.src = '/placeholder.webp';
+                    }}
+                  />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
