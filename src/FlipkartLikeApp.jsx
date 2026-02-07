@@ -1229,7 +1229,9 @@ if (initialLoading) {
                     onChange={e => setManualAddrFull(prev => ({ ...prev, city: e.target.value }))}
                     className="border p-2 rounded"
                   />
-
+                  {manualErrors.city && (
+                                                        <p className="text-red-600 text-xs">{manualErrors.city}</p>
+                                    )}
                   <IndiaStateSelect
                     value={manualAddrFull.state}
                     onChange={state =>
