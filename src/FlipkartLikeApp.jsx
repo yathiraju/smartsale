@@ -406,10 +406,12 @@ export default function FlipkartLikeApp() {
             // { body: { ... }, deliveryAddress: { name, phone, addressLine1, ... } }
 
             const deliveryAddress = buildDeliveryAddressForCapture();
+            const userName = '91' + localStorage.getItem('rzp_username');
 
             const body = {
               // map provider response fields to the 'body' map
               body: {
+                username: userName,
                 razorpay_order_id: response?.razorpay_order_id || '',
                 razorpay_payment_id: response?.razorpay_payment_id || '',
                 razorpay_signature: response?.razorpay_signature || '',
