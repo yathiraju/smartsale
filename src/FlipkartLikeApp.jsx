@@ -310,34 +310,38 @@ export default function FlipkartLikeApp() {
 
   // ---------- add helper to normalize delivery address for capture ----------
   function buildDeliveryAddressForCapture() {
-    // prefer selectedAddress (chosen from saved/manual), fallback to guestAddress
-    const src = selectedAddress || guestAddress || null;
-    if (!src) return null;
 
-    // Map fields to the backend AddressDto shape:
-    // AddressDto(
-    //   name, phone, addressLine1, addressLine2, city, state, pincode, country
-    // )
-    const name = src.name || src.line1 || usernameDisplay || '';
-    const phone = src.phone || src.mobile || ''; // try different keys just in case
-    const addressLine1 = src.line1 || src.addressLine1 || src.address1 || '';
-    const addressLine2 = src.line2 || src.addressLine2 || src.address2 || '';
-    const city = src.city || '';
-    const state = src.state || '';
-    const pincode = String(src.pincode || src.postalCode || src.zip || '').trim();
-    const country = src.country || 'IN';
+    if (selectedAddress) {
+      return {
+        id: selectedAddress.id ?? null,  // 👈 key line
+        name: selectedAddress.name,
+        phone: selectedAddress.phone,
+        addressLine1: selectedAddress.line1,
+        addressLine2: selectedAddress.line2,
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        pincode: selectedAddress.pincode,
+        country: selectedAddress.country || "IN"
+      };
+    }
 
-    return {
-      name,
-      phone,
-      addressLine1,
-      addressLine2,
-      city,
-      state,
-      pincode,
-      country
-    };
+    if (guestAddress) {
+      return {
+        id: null, // 👈 EXPLICIT
+        name: guestAddress.name,
+        phone: guestAddress.phone,
+        addressLine1: guestAddress.line1,
+        addressLine2: guestAddress.line2,
+        city: guestAddress.city,
+        state: guestAddress.state,
+        pincode: guestAddress.pincode,
+        country: guestAddress.country || "IN"
+      };
+    }
+
+    return null;
   }
+
 
   function validateAddress(addr, isValidPhone, isValidPincode) {
     const errors = {};
@@ -406,10 +410,12 @@ export default function FlipkartLikeApp() {
             // { body: { ... }, deliveryAddress: { name, phone, addressLine1, ... } }
 
             const deliveryAddress = buildDeliveryAddressForCapture();
+            const userName = '91' + localStorage.getItem('rzp_username');
 
             const body = {
               // map provider response fields to the 'body' map
               body: {
+                username: userName,
                 razorpay_order_id: response?.razorpay_order_id || '',
                 razorpay_payment_id: response?.razorpay_payment_id || '',
                 razorpay_signature: response?.razorpay_signature || '',
