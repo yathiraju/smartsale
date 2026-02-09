@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { FiTrash2 } from "react-icons/fi";
+import { FaShoppingCart } from "react-icons/fa";
 
 
 /**
@@ -103,15 +104,7 @@ export default function ProductCard({
             className="w-full inline-flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-3 py-2 rounded shadow-sm border-2 border-yellow-300"
             type="button"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden
-            >
-              <path d="M7 4h-2l-1 2H1v2h2l3.6 7.59-1.35 2.45A1 1 0 0 0 6 19h12v-2H6.42a.25.25 0 0 1-.23-.15L6.1 16h9.45a1 1 0 0 0 .95-.68L19.92 8H7.21L7 6.5V4z" />
-            </svg>
+            <FaShoppingCart className="w-4 h-4" />
             Add
           </button>
         ) : (
