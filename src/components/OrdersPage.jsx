@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { getApiHost } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import Footer from "./Footer";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -210,6 +211,9 @@ useEffect(() => {
           </div>
         ))}
       </div>
+      <Footer />
     </div>
+
   );
+
 }
