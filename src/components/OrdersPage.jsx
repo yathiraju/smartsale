@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { getApiHost } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import Footer from "./Footer";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -105,13 +106,25 @@ useEffect(() => {
   }
 
   return (
+
     <div className="max-w-6xl mx-auto p-6">
+       {/* 🖤 BLACK HEADER ROW */}
+           <div className="bg-black">
+             <div className="max-w-6xl mx-auto px-6 py-4 flex justify-center">
+               <img
+                 src="/smartsale.png"
+                 alt="SmartSale"
+                 className="h-10 w-auto object-contain"
+               />
+             </div>
+           </div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">My Orders</h1>
 
         <button
           onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm"
+          className="px-4 py-2 bg-blue-600 text-white rounded font-medium
+                       hover:bg-blue-700 active:bg-blue-800 transition"
         >
           ← Back
         </button>
@@ -210,6 +223,9 @@ useEffect(() => {
           </div>
         ))}
       </div>
+      <Footer />
     </div>
+
   );
+
 }
