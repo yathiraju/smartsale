@@ -89,6 +89,17 @@ export default function Login() {
   }
 
   return (
+      <div className="max-w-6xl mx-auto p-6">
+             {/* 🖤 BLACK HEADER ROW */}
+                 <div className="bg-black">
+                   <div className="max-w-6xl mx-auto px-6 py-4 flex justify-center">
+                     <img
+                       src="/smartsale.png"
+                       alt="SmartSale"
+                       className="h-10 w-auto object-contain"
+                     />
+                   </div>
+                 </div>
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <form
         onSubmit={handleSubmit}
@@ -154,6 +165,7 @@ export default function Login() {
           </button>
         )}
       </form>
+    </div>
     </div>
   );
 }
