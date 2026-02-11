@@ -22,6 +22,24 @@ export function useOtpAuth(api) {
     inFlightRef.current = false;
   }
 
+  function startTimer(seconds) {
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    setExpiresIn(seconds);
+
+    timerRef.current = setInterval(() => {
+      setExpiresIn((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+
   // 🔴 CENTRAL ERROR HANDLER
 function handleApiError(err, fallbackMessage) {
   if (err?.name === "AbortError") return;
@@ -65,7 +83,7 @@ function handleApiError(err, fallbackMessage) {
 
       setRequestId(res.requestId);
       setStep("OTP");
-      setExpiresIn(res.expiresIn || 300);
+      startTimer(res.expiresIn || 300);
 
     } catch (err) {
       handleApiError(err);
@@ -74,6 +92,7 @@ function handleApiError(err, fallbackMessage) {
       inFlightRef.current = false;
     }
   }
+
 
   async function verifyOtp(phone, otp) {
     if (loading || inFlightRef.current) return;
@@ -107,7 +126,9 @@ function handleApiError(err, fallbackMessage) {
     setExpiresIn(0);
   }
 
-  useEffect(() => cleanup, []);
+  useEffect(() => {
+    return cleanup;
+  }, []);
 
   return {
     step,
