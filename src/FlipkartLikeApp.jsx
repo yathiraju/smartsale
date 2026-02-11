@@ -1321,6 +1321,61 @@ if (initialLoading) {
           </div>
         </div>
       )}
+  {/* ABOUT CTO SECTION */}
+  <section className="bg-gray-50 border-t mt-12">
+    <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+
+        {/* Profile Image */}
+        <div className="flex justify-center md:justify-start">
+          <img
+            src="/cto.jpg"
+            alt="CTO - Smart Sales"
+            className="w-40 h-40 rounded-full object-cover shadow-md border"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="md:col-span-2">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            About Me (Yathiraju Kolli)
+          </h2>
+
+          <p className="text-gray-700 leading-relaxed mb-4">
+            I am a technology professional with over <strong>13 years of experience </strong>
+            in the IT industry, specializing in <strong>solution architecture, scalable
+            e-commerce platforms, and enterprise application development</strong>.
+            Throughout my career, I have designed and delivered high-performance digital
+            solutions that support business growth and operational efficiency.
+          </p>
+
+          <p className="text-gray-700 leading-relaxed mb-4">
+            I have worked across <strong>Canada</strong>, including major technology hubs
+            such as <strong>Toronto and Vancouver</strong>, gaining valuable international
+            exposure and hands-on experience with global delivery standards, cloud-native
+            architectures, and customer-centric product design.
+          </p>
+
+          <p className="text-gray-700 leading-relaxed mb-4">
+            As the <strong>Chief Technology Officer (CTO) of Smart Sales</strong>, an
+            end-to-end e-commerce application, I drive the technical vision, system
+            architecture, and innovation roadmap. My focus is on building a
+            <strong> secure, scalable, and reliable platform</strong> that enables seamless
+            online selling, efficient order management, secure payments, and a smooth user
+            experience for both customers and businesses.
+          </p>
+
+          <p className="text-gray-700 leading-relaxed">
+            I am passionate about leveraging modern technologies to create
+            <strong> future-ready e-commerce solutions</strong> that are flexible,
+            performant, and aligned with real-world business needs.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <Footer />
 
     </>
