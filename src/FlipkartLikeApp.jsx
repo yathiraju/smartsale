@@ -401,8 +401,13 @@ export default function FlipkartLikeApp() {
         amount: rzpOrder.amount,
         currency: rzpOrder.currency,
         order_id: rzpOrder.providerOrderId,
-        name: 'Shop At Smart Sale',
+        name: 'Shop At SmartSales',
         description: 'Order ' + appId,
+        prefill: {
+            contact: localStorage.getItem('rzp_username'),   // 👈 this prepopulates phone
+            name: usernameDisplay || '',
+            email: '' // optional
+          },
         handler: async (response) => {
           try {
             // response contains razorpay_order_id, razorpay_payment_id, razorpay_signature, etc.
