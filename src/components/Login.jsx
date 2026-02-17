@@ -2,6 +2,8 @@ import React, { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken, setUser } from "../services/api";
 import { useOtpAuth } from "../hooks/useOtpAuth";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
 
 export default function Login() {
   const phoneRef = useRef(null);
@@ -117,13 +119,27 @@ export default function Login() {
         )}
 
         {/* Phone */}
-        <input
-          ref={phoneRef}
-          type="tel"
-          placeholder="Enter mobile number"
-          disabled={step === "OTP"}
-          className="border p-2 rounded w-full mb-3 disabled:bg-gray-100"
-        />
+        <div className="mb-3">
+          <PhoneInput
+            country={"in"}   // default India
+            enableSearch={true}
+            disabled={step === "OTP"}
+            inputClass="!w-full !py-2"
+            containerClass="!w-full"
+            buttonClass="!border"
+            onChange={(value, country) => {
+              // Extract last 10 digits only (ignore country code)
+              const numberOnly = value.slice(-10);
+              if (phoneRef.current) {
+                phoneRef.current.value = numberOnly;
+              }
+            }}
+          />
+
+          {/* Hidden input to keep your existing logic unchanged */}
+          <input type="hidden" ref={phoneRef} />
+        </div>
+
 
         {/* OTP */}
         {step === "OTP" && (
